@@ -12,6 +12,7 @@ import com.ing.engine.execution.data.DataProcessor;
 import com.ing.engine.execution.data.Parameter;
 import com.ing.engine.execution.data.StepSet;
 import com.ing.engine.execution.exception.AppiumDriverException;
+
 import com.ing.engine.execution.exception.DriverClosedException;
 import com.ing.engine.execution.exception.TestFailedException;
 import com.ing.engine.execution.exception.UnCaughtException;
@@ -22,6 +23,9 @@ import com.ing.engine.execution.exception.data.GlobalDataNotFoundException;
 import com.ing.engine.execution.exception.data.TestDataNotFoundException;
 import com.ing.engine.reporting.TestCaseReport;
 import com.ing.engine.support.Step;
+import com.ing.ingenious.api.exception.ActionException;
+import com.ing.ingenious.api.exception.ForcedException;
+
 import com.ing.ingenious.api.exception.ActionException;
 import com.ing.ingenious.api.exception.ForcedException;
 import com.ing.ingenious.api.exception.mobile.ElementException;
@@ -260,11 +264,13 @@ public class TestCaseRunner {
         }
     }
 
+
     /***
      * Check for end of loops to set breakSubIterationFlag to true.
      * Applies to dynamic Start Param - End Param blocks.
      * Execution is based on the occurrence of the next data in the test sheet.
      * This method flags that the last data in the data sheet has been reached.
+     *
      *
      * @param testStep
      * @param currStep
@@ -273,11 +279,13 @@ public class TestCaseRunner {
      *      false - Allows the loop to iterate one more time
      */
     private boolean checkIfLastData(TestStep testStep, int currStep) {
+    private boolean checkIfLastData(TestStep testStep, int currStep) {
         //check the next step if it is the end of a loop
         try {
             // Read next data if step with data access
             String data = "";
             String testInput = testStep.getInput();
+            TestCase parentTestCase = this.testCase.getParentTestCase();
             if (!testInput.startsWith("@") && DataProcessor.isInputPatternDataSheet(testInput)) {
                 String sheet = testStep.getInput().split(":")[0];
                 String dataCol = testStep.getInput().split(":")[1];
@@ -285,6 +293,8 @@ public class TestCaseRunner {
                 data =
                     DataAccess.getNextData(
                         this,
+                        getRoot().getTestCase().getScenario().getName(),
+                        getRoot().getTestCase().getName(),
                         sheet,
                         dataCol,
                         parameter.getIteration() + "",
@@ -294,7 +304,12 @@ public class TestCaseRunner {
             if (data == null) {
                 // Execution has reached end of the test data sheet
                 this.breakSubIterationFlag = true;
+                if (parentTestCase != null && parentTestCase.getDynamicMaxIter() == null) {
+                    parentTestCase.setDynamicMaxIter(this.currentSubIteration);
+                    this.getRoot().getTestCase().setDynamicMaxIter(this.currentSubIteration);
+                }
             }
+
 
             String condition = testStep.getCondition();
             if (this.breakSubIterationFlag) {
@@ -303,15 +318,21 @@ public class TestCaseRunner {
                     testCase.getTestSteps().size() <= currStep + 1 ||
                     Parameter.endParamRLoop(condition)
                 ) {
+                if (
+                    testCase.getTestSteps().size() <= currStep + 1 ||
+                    Parameter.endParamRLoop(condition)
+                ) {
                     return true;
                 }
             }
+        } catch (Exception ex) {
         } catch (Exception ex) {
             // Exceptions are not applicable since this is a checker method.
             System.out.println(ex.getMessage());
         } catch (Throwable ex) {
             System.out.println(ex.getMessage());
         }
+
 
         return false;
     }
@@ -330,6 +351,7 @@ public class TestCaseRunner {
                     stepStack.peek().next();
                 }
             }
+        }
         }
         return currStep;
     }
@@ -368,11 +390,31 @@ public class TestCaseRunner {
 
     //</editor-fold>
 
+    //</editor-fold>
+
     //<editor-fold defaultstate="collapsed" desc="error handling">
     private void onError(Throwable ex) {
         if (ex.getMessage().contains("Reached the end of data sheet.")) {
+        if (ex.getMessage().contains("Reached the end of data sheet.")) {
             // Do nothing
         } else {
+            if (!ex.getMessage().contains("ActionException")) reportOnError(
+                getStepName(),
+                ex.getMessage(),
+                Status.DEBUG
+            );
+            if (exe.isContinueOnError()) {
+                LOG.log(
+                    Level.SEVERE,
+                    ex.getMessage(),
+                    Optional.ofNullable(ex.getCause()).orElse(ex)
+                );
+            } else {
+                if (ex instanceof RuntimeException) {
+                    throw new TestFailedException(scenario(), testcase(), ex);
+                }
+                throw new UnCaughtException(ex);
+            }
             if (!ex.getMessage().contains("ActionException")) reportOnError(
                 getStepName(),
                 ex.getMessage(),
@@ -403,6 +445,7 @@ public class TestCaseRunner {
     }
 
     private void onPlaywrightException(RuntimeException ex) {
+        if (exe.isContinueOnError()) {} else {
         if (exe.isContinueOnError()) {} else {
             throw new TestFailedException(scenario(), testcase(), ex);
         }
@@ -444,13 +487,20 @@ public class TestCaseRunner {
         Optional
             .ofNullable(getReport())
             .ifPresent(report -> report.updateTestLog(err, desc, status));
+        Optional
+            .ofNullable(getReport())
+            .ifPresent(report -> report.updateTestLog(err, desc, status));
     }
+
+    //</editor-fold>
 
     //</editor-fold>
 
     //<editor-fold defaultstate="collapsed" desc="run">
     public void run(CommandControl cc, int iter) throws DriverClosedException, TestFailedException {
+    public void run(CommandControl cc, int iter) throws DriverClosedException, TestFailedException {
         parameter.setIteration(iter);
+        while (!stepStack.empty()) {
         while (!stepStack.empty()) {
             stepStack.pop();
         }
@@ -459,37 +509,50 @@ public class TestCaseRunner {
             testCase.loadTableModel();
             /*
              * caution: breaking the loop will stop the iteration
+             * caution: breaking the loop will stop the iteration
              */
             boolean isLastData = false;
             this.breakSubIterationFlag = false;
             testCase.setExitParamLoop(false);
 
+            TestCase parentTestCase = testCase.getParentTestCase();
             for (int currStep = 0; canRunStep(currStep); currStep++) {
                 TestStep testStep = testCase.getTestSteps().get(currStep);
-                TestCase parentTestCase = testCase.getParentTestCase();
-                this.currentStepIndex = currStep;
 
                 if (!testStep.isCommented()) {
                     checkForStartLoop(testStep, currStep);
                     try {
-                        // For reusable components, exit after End Param
-                        // once exitParamLoop flag is detected
-                        if (testCase.exitParamLoop()) {
-                            if (Parameter.endParamRLoop(testStep.getCondition())) {
-                                // Run the last iteration step
-                                runStep(testStep);
-
-                                if (canRunStep(currStep + 1)) {
-                                    // Skip to the step outside the loop block, after the step with End Param condition
-                                    currStep++;
-                                    testStep = testCase.getTestSteps().get(currStep);
-                                } else {
-                                    continue;
-                                }
-                                checkForEndLoop(testStep, currStep);
-                                testCase.setExitParamLoop(false);
+                        if (
+                            (
+                                Parameter.startParamRLoop(testStep.getCondition()) &&
+                                (
+                                    parentTestCase != null &&
+                                    parentTestCase.getDynamicMaxIter() != null &&
+                                    (
+                                        parentTestCase.getDynamicMaxIter() <=
+                                        this.currentSubIteration
+                                    ) ||
+                                    (
+                                        this.getRoot().getTestCase().getDynamicMaxIter() != null &&
+                                        this.getRoot().getTestCase().getDynamicMaxIter() <=
+                                        this.currentSubIteration
+                                    )
+                                )
+                            )
+                        ) {
+                            //Skip to EndParam
+                            while (!Parameter.endParamRLoop(testStep.getCondition())) {
+                                currStep++;
+                                testStep = testCase.getTestSteps().get(currStep);
+                            }
+                            // Increment one more time to exit the Param block
+                            currStep++;
+                            testStep = testCase.getTestSteps().get(currStep);
+                            if (parentTestCase != null) {
+                                parentTestCase.setDynamicMaxIter(null);
                             }
                         }
+
 
                         runStep(testStep);
                         if (testStep.isHardAssertion() && lastStepFailed()) {
@@ -551,6 +614,10 @@ public class TestCaseRunner {
                     }
                     currStep = checkForEndLoop(testStep, currStep);
                 }
+            }
+            if (parentTestCase != null) {
+                parentTestCase.setDynamicMaxIter(null);
+                this.getRoot().getTestCase().setDynamicMaxIter(null);
             }
         }
     }

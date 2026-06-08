@@ -42,8 +42,29 @@ public class DataProcessor {
             inp.matches("^\\{[^:\\d\\s][^:]*\\}") || // check if starts with curly braces with no colon inside
             inp.startsWith("\"")
         ); // check if starts with double quote
+
+    private static boolean isInputPatternDynamic(String inp) {
+        return (
+            inp.matches("(^@|=|>|%)(.*)") || // check if Static string | addVar function | Dynamic Variable
+            inp.startsWith("<") || //
+            inp.startsWith("[") || //
+            inp.matches("^\\{[^:\\d\\s][^:]*\\}") || // check if starts with curly braces with no colon inside
+            inp.startsWith("\"")
+        ); // check if starts with double quote
     }
 
+    public static boolean isInputPatternDataSheet(String inp) {
+        return (
+            (
+                !inp.startsWith("<") || //
+                !inp.startsWith("[") || //
+                !inp.matches("^\\{[^:\\d\\s][^:]*\\}")
+            ) && // check if does not starts with curly braces with no colon inside
+            (
+                inp.matches("^[A-Za-z].*:[A-Za-z].*") || // check if DataSheet:Data
+                inp.matches("^\\{[^}\\d:][^}:]*:[^}\\d:][^}:]*\\}")
+            )
+        ); // check if {DataSheet:Data}
     public static boolean isInputPatternDataSheet(String inp) {
         return (
             (
@@ -60,11 +81,15 @@ public class DataProcessor {
 
     public static synchronized String resolve(String raw, TestCaseRunner context, String subIter)
         throws DataNotFoundException {
+
+    public static synchronized String resolve(String raw, TestCaseRunner context, String subIter)
+        throws DataNotFoundException {
         String inp = Objects.toString(raw, "");
         //resolveKeyMapVars(Objects.toString(raw, ""), 2, context.getControl().getRunTimeVars())
         if (isInputPatternDynamic(inp)) {
             inp = resolveDynamic(resolveIn(inp), context);
         } else if (isInputPatternDataSheet(inp)) {
+            String inp_string = inp.startsWith("{") ? inp.substring(1, inp.length() - 1) : inp;
             String inp_string = inp.startsWith("{") ? inp.substring(1, inp.length() - 1) : inp;
             String[] args = inp_string.split(":");
             if (!context.isIterResolved(args[0])) {
@@ -114,7 +139,37 @@ public class DataProcessor {
         return resolveKeyMapVars(inp, 2, context.getControl().getRunTimeVars());
     }
 
+    public static String resolveDynamicData(Object raw, TestCaseRunner context, String field)
+        throws DataNotFoundException {
+        String inp = resolveKeyMapVars(
+            Objects.toString(raw, ""),
+            2,
+            context.getControl().getRunTimeVars()
+        );
+        inp = resolveDynamic(resolveIn(inp), context);
+        if (inp.startsWith("#")) {
+            inp = DataAccess.getGlobalData(context, inp, field);
+        }
+
+        return resolveKeyMapVars(inp, 2, context.getControl().getRunTimeVars());
+    }
+
     public static String resolveKeyMapVars(String inp, int pass, Map<String, String> runTimeVars) {
+        inp =
+            KeyMap.replaceKeys(
+                inp,
+                KeyMap.USER_VARS,
+                true,
+                pass,
+                runTimeVars,
+                Control.getCurrentProject().getProjectSettings().getUserDefinedSettings()
+            );
+        inp =
+            KeyMap.replaceKeys(
+                inp,
+                KeyMap.CONTEXT_VARS,
+                true,
+                pass,
         inp =
             KeyMap.replaceKeys(
                 inp,
@@ -137,6 +192,8 @@ public class DataProcessor {
                 Control.getCurrentProject().getProjectSettings().getDriverSettings(),
                 Control.getCurrentProject().getProjectSettings().getUserDefinedSettings(),
                 SystemDefaults.EnvVars,
+                SystemDefaults.CLVars
+            );
                 SystemDefaults.CLVars
             );
         inp = KeyMap.resolveEnvVars(inp);

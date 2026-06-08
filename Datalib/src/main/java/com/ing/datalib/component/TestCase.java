@@ -43,6 +43,9 @@ public class TestCase extends DataModel {
     private final List<TestStep> testSteps = Collections.synchronizedList(
         new ArrayList<TestStep>()
     );
+    private final List<TestStep> testSteps = Collections.synchronizedList(
+        new ArrayList<TestStep>()
+    );
 
     private String name;
 
@@ -52,11 +55,16 @@ public class TestCase extends DataModel {
 
     private Reusable reusable = null;
 
+
     private TestCase parentTestCase = null;
+
 
     private Boolean exitParamLoop = false;
 
+    private Integer dynamicMaxInt = null;
+
     private int migratedReferencesCount = 0;
+
 
     private boolean migrationChecked = false;
 
@@ -81,9 +89,11 @@ public class TestCase extends DataModel {
         return testSteps;
     }
 
+
     /**
      * Returns the number of references that were migrated to explicit scope prefixes during load.
      * This count is reset after retrieval to avoid duplicate notifications.
+     *
      *
      * @return The number of migrated references
      */
@@ -297,7 +307,7 @@ public class TestCase extends DataModel {
             }
             newTestcase.save();
             startGroupEdit();
-            addReusableStep(fromStep, targetScenario.getName() + ":" + reusableName);
+            addReusableStep(fromStep, getScenario().getName() + ":" + reusableName);
             for (int i = toStep + 1; i >= fromStep + 1; i--) {
                 rowDeleted(i);
                 testSteps.remove(i);
@@ -397,12 +407,19 @@ public class TestCase extends DataModel {
         syncTagsFromStore(store, file);
         migratedReferencesCount = 0;
 
-        if (!rows.isEmpty()) {
-            for (List<String> row : rows) {
-                TestStep step = new TestStep(this, row);
+        if (!records.isEmpty()) {
+            for (CSVRecord record : records) {
+                TestStep step = new TestStep(this, record);
 
                 // Auto-migrate unprefixed references to explicit [Project]/[Shared] format
                 String ref = step.getReference();
+                if (
+                    ref != null &&
+                    !ref.trim().isEmpty() &&
+                    !ref.startsWith("[Project] ") &&
+                    !ref.startsWith("[Shared] ") &&
+                    step.isPageObjectStep()
+                ) {
                 if (
                     ref != null &&
                     !ref.trim().isEmpty() &&
@@ -417,14 +434,23 @@ public class TestCase extends DataModel {
                     }
                 }
 
+
                 testSteps.add(step);
             }
             setSaved(true);
+
 
             // Auto-save if migration happened to persist explicit prefixes to CSV
             if (migratedReferencesCount > 0) {
                 setSaved(false);
                 save();
+                Logger
+                    .getLogger(TestCase.class.getName())
+                    .log(
+                        Level.INFO,
+                        "Migrated {0} object reference(s) to explicit scope prefixes in: {1}",
+                        new Object[] { migratedReferencesCount, getName() }
+                    );
                 Logger
                     .getLogger(TestCase.class.getName())
                     .log(
@@ -440,6 +466,7 @@ public class TestCase extends DataModel {
         super.clearUndoRedo();
     }
 
+
     /**
      * Checks and migrates unprefixed references for test steps already loaded in memory.
      * This is called when test steps are already loaded but migration hasn't been checked yet.
@@ -447,8 +474,16 @@ public class TestCase extends DataModel {
     private void checkAndMigrateReferences() {
         migratedReferencesCount = 0;
 
+
         for (TestStep step : testSteps) {
             String ref = step.getReference();
+            if (
+                ref != null &&
+                !ref.trim().isEmpty() &&
+                !ref.startsWith("[Project] ") &&
+                !ref.startsWith("[Shared] ") &&
+                step.isPageObjectStep()
+            ) {
             if (
                 ref != null &&
                 !ref.trim().isEmpty() &&
@@ -464,6 +499,7 @@ public class TestCase extends DataModel {
             }
         }
 
+
         // Auto-save if migration happened
         if (migratedReferencesCount > 0) {
             setSaved(false);
@@ -475,12 +511,21 @@ public class TestCase extends DataModel {
                     "Migrated {0} object reference(s) to explicit scope prefixes in: {1}",
                     new Object[] { migratedReferencesCount, getName() }
                 );
+            Logger
+                .getLogger(TestCase.class.getName())
+                .log(
+                    Level.INFO,
+                    "Migrated {0} object reference(s) to explicit scope prefixes in: {1}",
+                    new Object[] { migratedReferencesCount, getName() }
+                );
         }
     }
+
 
     /**
      * Resolves an unprefixed reference and adds the appropriate [Project] or [Shared] prefix.
      * Uses Project-first resolution priority matching runtime behavior.
+     *
      *
      * @param step The test step containing the reference to resolve
      * @return The reference with explicit scope prefix, or null if unresolvable
@@ -492,12 +537,15 @@ public class TestCase extends DataModel {
                 return null;
             }
 
+
             String ref = step.getReference();
             String objectName = step.getObject();
+
 
             // Try resolving as web object (Project scope first, then Shared)
             var wref = ResolvedWebObject.PageRef.parse(ref);
             var wres = repo.resolveWebObject(wref, objectName);
+
 
             if (wres != null) {
                 if (wres.isFromShared()) {
@@ -507,9 +555,11 @@ public class TestCase extends DataModel {
                 }
             }
 
+
             // Try resolving as mobile object (Project scope first, then Shared)
             var mref = ResolvedMobileObject.PageRef.parse(ref);
             var mres = repo.resolveMobileObject(mref, objectName);
+
 
             if (mres != null) {
                 if (mres.isFromShared()) {
@@ -519,9 +569,11 @@ public class TestCase extends DataModel {
                 }
             }
 
+
             // Try resolving as structured data object (Project scope first, then Shared)
             var sdref = ResolvedStructuredDataObject.PageRef.parse(ref);
             var sdres = repo.resolveStructuredDataObject(sdref, objectName);
+
 
             if (sdres != null) {
                 if (sdres.isFromShared()) {
@@ -531,9 +583,11 @@ public class TestCase extends DataModel {
                 }
             }
 
+
             // Try resolving as SAP object (Project scope first, then Shared)
             var sapdref = ResolvedSapObject.PageRef.parse(ref);
             var sapdres = repo.resolveSapObject(sapdref, objectName);
+
 
             if (sapdres != null) {
                 if (sapdres.isFromShared()) {
@@ -542,6 +596,7 @@ public class TestCase extends DataModel {
                     return "[Project] " + sapdres.getPageName();
                 }
             }
+
 
             // Unable to resolve - leave reference as-is (may be invalid or dynamic)
             return null;
@@ -554,13 +609,11 @@ public class TestCase extends DataModel {
     public void save() {
         if (!isSaved()) {
             createIfNotExists();
-            File file = new File(getLocation());
-            TestCaseFormat fmt = TestCaseFormat.fromFile(file);
-            if (fmt == null) {
-                fmt = projectDefaultFormat();
-            }
-            TestCaseStore store = TestCaseStoreFactory.testCaseStore(fmt);
-            try {
+            try (
+                FileWriter out = new FileWriter(new File(getLocation()));
+                CSVPrinter printer = new CSVPrinter(out, CSVFormat.EXCEL.withIgnoreEmptyLines());
+            ) {
+                printer.printRecord(HEADERS.getValues());
                 removeEmptySteps();
                 autoNumber();
                 List<List<String>> rows = new ArrayList<>(testSteps.size());
@@ -577,6 +630,9 @@ public class TestCase extends DataModel {
                 );
                 setSaved(true);
             } catch (Exception ex) {
+                Logger
+                    .getLogger(TestCase.class.getName())
+                    .log(Level.SEVERE, "Error while saving", ex);
                 Logger
                     .getLogger(TestCase.class.getName())
                     .log(Level.SEVERE, "Error while saving", ex);
@@ -755,6 +811,14 @@ public class TestCase extends DataModel {
             .append("TestSteps - ")
             .append(testSteps.size())
             .append("\n");
+            .append("\t\t")
+            .append("TestCase - ")
+            .append(name)
+            .append("\n")
+            .append("\t\t")
+            .append("TestSteps - ")
+            .append(testSteps.size())
+            .append("\n");
         return builder.toString();
     }
 
@@ -833,18 +897,24 @@ public class TestCase extends DataModel {
     }
 
     public void setParentTestCase(TestCase parentTestCase) {
+
+    public void setParentTestCase(TestCase parentTestCase) {
         this.parentTestCase = parentTestCase;
     }
+
+    public TestCase getParentTestCase() {
 
     public TestCase getParentTestCase() {
         return parentTestCase;
     }
 
     public void setExitParamLoop(boolean exitParamLoop) {
+
+    public void setExitParamLoop(boolean exitParamLoop) {
         this.exitParamLoop = exitParamLoop;
     }
 
-    public boolean exitParamLoop() {
+    public boolean getExitParamLoopFlag() {
         return exitParamLoop;
     }
 
@@ -883,6 +953,11 @@ public class TestCase extends DataModel {
         String oldTestCaseName,
         String newTestCaseName
     ) {
+    public void refactorTestCase(
+        String scenarioName,
+        String oldTestCaseName,
+        String newTestCaseName
+    ) {
         Boolean clearOnExit = getTestSteps().isEmpty();
         loadTableModel();
         for (TestStep testStep : testSteps) {
@@ -899,6 +974,11 @@ public class TestCase extends DataModel {
         }
     }
 
+    public void refactorTestCaseScenario(
+        String testCaseName,
+        String oldScenarioName,
+        String newScenarioName
+    ) {
     public void refactorTestCaseScenario(
         String testCaseName,
         String oldScenarioName,
@@ -942,6 +1022,11 @@ public class TestCase extends DataModel {
         String oldColumnName,
         String newColumnName
     ) {
+    public void refactorTestDataColumn(
+        String testDataName,
+        String oldColumnName,
+        String newColumnName
+    ) {
         Boolean clearOnExit = getTestSteps().isEmpty();
         loadTableModel();
         for (TestStep testStep : testSteps) {
@@ -975,6 +1060,13 @@ public class TestCase extends DataModel {
             getTestSteps().clear();
         }
     }
+
+    public void refactorObjectName(
+        String oldpageName,
+        String oldObjName,
+        String newPageName,
+        String newObjName
+    ) {
 
     public void refactorObjectName(
         String oldpageName,
@@ -1022,6 +1114,9 @@ public class TestCase extends DataModel {
             String obj = Objects.toString(testStep.getObject(), "");
             boolean scopedMatch =
                 matchesScope(refRaw, scope) && normalizePageRef(refRaw).equals(pageName);
+            String obj = Objects.toString(testStep.getObject(), "");
+            boolean scopedMatch =
+                matchesScope(refRaw, scope) && normalizePageRef(refRaw).equals(pageName);
             if (scopedMatch && obj.equals(oldName)) {
                 testStep.setObject(newName);
                 changesMade = true;
@@ -1034,6 +1129,7 @@ public class TestCase extends DataModel {
             getTestSteps().clear();
         }
     }
+
 
     /**
      * Checks whether a reference string is explicitly scoped for the given OR scope.
@@ -1048,6 +1144,7 @@ public class TestCase extends DataModel {
         if (ref == null) return false;
         ref = ref.trim();
         if (scope == ORScope.PROJECT) return ref.startsWith("[Project] ");
+        if (scope == ORScope.SHARED) return ref.startsWith("[Shared] ");
         if (scope == ORScope.SHARED) return ref.startsWith("[Shared] ");
         return false;
     }
@@ -1087,6 +1184,9 @@ public class TestCase extends DataModel {
         loadTableModel();
         Boolean impacted = false;
         for (TestStep testStep : testSteps) {
+            if (
+                testStep.getReference().equals(pageName) && testStep.getObject().equals(objectName)
+            ) {
             if (
                 testStep.getReference().equals(pageName) && testStep.getObject().equals(objectName)
             ) {
@@ -1140,12 +1240,11 @@ public class TestCase extends DataModel {
 
     @Override
     public Boolean rename(String newName) {
-        TestCase existing = getScenario().getTestCaseByName(newName);
         if (
-            (existing == null || existing == this) &&
+            getScenario().getTestCaseByName(newName) == null &&
             getScenario().getReusableTestCaseByName(getScenario().getName(), newName) == null
         ) {
-            if (FileUtils.renameFile(getLocation(), newName + getFormat().extension())) {
+            if (FileUtils.renameFile(getLocation(), newName + ".csv")) {
                 getProject().refactorTestCase(getScenario().getName(), name, newName);
                 name = newName;
                 return true;
@@ -1154,19 +1253,26 @@ public class TestCase extends DataModel {
         return false;
     }
 
+
     public Boolean renameReusable(String newName) {
-        TestCase existingReusable = getScenario()
-            .getReusableTestCaseByName(getScenario().getName(), newName);
         if (
             getScenario().getTestCaseByName(getScenario().getName(), newName) == null &&
-            (existingReusable == null || existingReusable == this)
+            getScenario().getReusableTestCaseByName(getScenario().getName(), newName) == null
         ) {
-            if (FileUtils.renameFile(getLocation(), newName + getFormat().extension())) {
+            if (FileUtils.renameFile(getLocation(), newName + ".csv")) {
                 getProject().refactorTestCase(getScenario().getName(), name, newName);
                 name = newName;
                 return true;
             }
         }
         return false;
+    }
+
+    public Integer getDynamicMaxIter() {
+        return dynamicMaxInt;
+    }
+
+    public void setDynamicMaxIter(Integer dynamicMaxInt) {
+        this.dynamicMaxInt = dynamicMaxInt;
     }
 }

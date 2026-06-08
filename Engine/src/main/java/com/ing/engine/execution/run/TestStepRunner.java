@@ -2,11 +2,14 @@ package com.ing.engine.execution.run;
 
 import static java.lang.String.format;
 
+import static java.lang.String.format;
+
 import com.ing.datalib.component.Scenario;
 import com.ing.datalib.component.TestCase;
 import com.ing.datalib.component.TestStep;
 import com.ing.engine.constants.SystemDefaults;
 import com.ing.engine.core.CommandControl;
+
 import com.ing.engine.execution.data.DataProcessor;
 import com.ing.engine.execution.data.Parameter;
 import com.ing.engine.execution.exception.DriverClosedException;
@@ -15,10 +18,13 @@ import com.ing.engine.execution.exception.data.DataNotFoundException;
 import com.ing.engine.support.Step;
 import com.ing.engine.support.reflect.MethodExecutor;
 import com.ing.ingenious.api.exception.ForcedException;
+
+import com.ing.ingenious.api.exception.ForcedException;
 import com.ing.ingenious.api.exception.mobile.ElementException;
 import com.ing.ingenious.api.status.Status;
 import java.util.ArrayList;
 import java.util.List;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -159,23 +165,28 @@ public class TestStepRunner {
         }
     }
 
+    private void executeStringOperation(TestCaseRunner context) {
+        List<String> concatList = context.getControl().smartCommaSplitter(getStep().getInput());
+        List<String> result = new ArrayList();
+        for (String part : concatList) {
+            if (part.matches("%.*%")) result.add(
+                "'" + context.getControl().getVar(part) + "'"
+            ); else if (part.matches("^\\{.*:.*\\}")) result.add(
+                "'" + context.getControl().getDatasheet(part) + "'"
+            ); else if (part.matches("\".*\"")) result.add(
+                "'" + part.substring(1, part.length() - 1) + "'"
+            );
+        }
+        step.Data = String.join(",", result);
+        context.getControl().sync(step);
+    }
+
     private void executeStep(TestCaseRunner context, Step step, Parameter parameter)
+        throws Throwable {
         throws Throwable {
         step.printStep();
         if (step.ObjectName.equals("String Operations")) {
-            List<String> concatList = context.getControl().smartCommaSplitter(getStep().getInput());
-            List<String> result = new ArrayList();
-            for (String part : concatList) {
-                if (part.matches("%.*%")) result.add(
-                    "'" + context.getControl().getVar(part) + "'"
-                ); else if (part.matches("^\\{.*:.*\\}")) result.add(
-                    "'" + context.getControl().getDatasheet(part) + "'"
-                ); else if (part.matches("\".*\"")) result.add(
-                    "'" + part.substring(1, part.length() - 1) + "'"
-                );
-            }
-            step.Data = String.join(",", result);
-            context.getControl().sync(step);
+            executeStringOperation(context);
         } else {
             context.getControl().sync(step, String.valueOf(parameter.getSubIteration()));
         }
@@ -185,6 +196,7 @@ public class TestStepRunner {
     public void executeAction(TestCaseRunner context, String action) throws Throwable {
         if (!MethodExecutor.executeMethod(action, context.getControl())) {
             System.out.println("[ERROR][Could not find Action:" + action + "]");
+            context.getReport().updateTestLog(action, "[Could not find Action]", Status.DEBUG);
             context.getReport().updateTestLog(action, "[Could not find Action]", Status.DEBUG);
         }
     }

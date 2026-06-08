@@ -21,6 +21,8 @@ import java.util.Objects;
  *
  *
  *
+ *
+ *
  */
 public class DataAccess extends DataAccessInternal {
 
@@ -40,7 +42,16 @@ public class DataAccess extends DataAccessInternal {
      * @return the test data
      * @throws DataNotFoundException if the data not present
      *
+     *
      */
+    public static String getData(
+        TestCaseRunner context,
+        String sheet,
+        String field,
+        String iter,
+        String subIter
+    )
+        throws DataNotFoundException {
     public static String getData(
         TestCaseRunner context,
         String sheet,
@@ -64,9 +75,11 @@ public class DataAccess extends DataAccessInternal {
         return DataProcessor.resolve(val, context, field);
     }
 
+
     /**
      * Get the test data for the next iteration from the test data sheet
      * as specified sheet data that mathces the provided field, iteration and subiteration.
+     *
      *
      * @param context the context(environment,testcase,reusable and iteration)
      * which the data
@@ -79,26 +92,25 @@ public class DataAccess extends DataAccessInternal {
      */
     public static String getNextData(
         TestCaseRunner context,
+        String scn,
+        String tc,
         String sheet,
         String field,
         String iter,
         String subIter
     )
         throws DataNotFoundException {
-        String subIteration = (Integer.parseInt(subIter) + 1) + "";
-        Object val;
+        String nextSubIteration = (Integer.parseInt(subIter) + 1) + "";
+        String val = null;
         TestDataModel env;
         TestDataModel def = getDefModel(context, sheet);
         if (validEnv(context)) {
             env = getModel(context, sheet);
-            val = getData(context, env, def, field, iter, subIteration);
+            val = getDataFromModel(env, field, scn, tc, iter, nextSubIteration);
         } else {
-            val = getData(context, def, field, iter, subIteration);
+            val = getDataFromModel(def, field, scn, tc, iter, nextSubIteration);
         }
-        if (val == null) {
-            return null;
-        }
-        return DataProcessor.resolve(val, context, field);
+        return val;
     }
 
     /**
@@ -117,7 +129,17 @@ public class DataAccess extends DataAccessInternal {
      * @param subIter the sub iteration for the data
      * @throws DataNotFoundException if the data not present
      *
+     *
      */
+    public static void putData(
+        TestCaseRunner context,
+        String sheet,
+        String field,
+        String newVal,
+        String iter,
+        String subIter
+    )
+        throws DataNotFoundException {
     public static void putData(
         TestCaseRunner context,
         String sheet,
@@ -159,7 +181,18 @@ public class DataAccess extends DataAccessInternal {
      * @return the test data
      * @throws DataNotFoundException if the data not present
      *
+     *
      */
+    public static String getData(
+        TestCaseRunner context,
+        String sheet,
+        String field,
+        String scn,
+        String tc,
+        String iter,
+        String subIter
+    )
+        throws DataNotFoundException {
     public static String getData(
         TestCaseRunner context,
         String sheet,
@@ -204,7 +237,19 @@ public class DataAccess extends DataAccessInternal {
      * @param subIter the sub iteration for the data
      * @throws DataNotFoundException if the data not present
      *
+     *
      */
+    public static void putData(
+        TestCaseRunner context,
+        String sheet,
+        String field,
+        String newVal,
+        String scn,
+        String tc,
+        String iter,
+        String subIter
+    )
+        throws DataNotFoundException {
     public static void putData(
         TestCaseRunner context,
         String sheet,
@@ -219,6 +264,8 @@ public class DataAccess extends DataAccessInternal {
         boolean updated = false;
         TestDataModel def = getDefModel(context, sheet);
         if (validEnv(context)) {
+            updated =
+                putDataToModel(getModel(context, sheet), field, newVal, scn, tc, iter, subIter);
             updated =
                 putDataToModel(getModel(context, sheet), field, newVal, scn, tc, iter, subIter);
         }
@@ -244,13 +291,21 @@ public class DataAccess extends DataAccessInternal {
      * @return the test data
      * @throws DataNotFoundException if the data not present
      *
+     *
      */
     public static String getGlobalData(TestCaseRunner context, String gid, String field)
+        throws DataNotFoundException {
         throws DataNotFoundException {
         Object val;
         GlobalDataModel env;
         GlobalDataModel def = context.executor().dataProvider().defData().getGlobalData();
         if (validEnv(context)) {
+            env =
+                context
+                    .executor()
+                    .dataProvider()
+                    .getTestDataFor(context.executor().runEnv())
+                    .getGlobalData();
             env =
                 context
                     .executor()
@@ -281,7 +336,15 @@ public class DataAccess extends DataAccessInternal {
      * @param value the value
      * @throws DataNotFoundException if the data not present
      *
+     *
      */
+    public static void putGlobalData(
+        TestCaseRunner context,
+        String gid,
+        String field,
+        String value
+    )
+        throws DataNotFoundException {
     public static void putGlobalData(
         TestCaseRunner context,
         String gid,
@@ -291,6 +354,12 @@ public class DataAccess extends DataAccessInternal {
         throws DataNotFoundException {
         GlobalDataModel env = context.executor().dataProvider().defData().getGlobalData();
         if (validEnv(context)) {
+            env =
+                context
+                    .executor()
+                    .dataProvider()
+                    .getTestDataFor(context.executor().runEnv())
+                    .getGlobalData();
             env =
                 context
                     .executor()
@@ -318,6 +387,117 @@ public class DataAccess extends DataAccessInternal {
      * @return the data value
      */
     private static Object getData(
+        TestCaseRunner context,
+        TestDataModel env,
+        TestDataModel def,
+        String field,
+        String iter,
+        String subIter
+    ) {
+    private static Object getData(
+        TestCaseRunner context,
+        TestDataModel env,
+        TestDataModel def,
+        String field,
+        String iter,
+        String subIter
+    ) {
+        if (notNull(env) && env.hasColumn(field)) {
+            Object val = getDataFromModel(
+                env,
+                field,
+                context.getRoot().scenario(),
+                context.getRoot().testcase(),
+                iter,
+                subIter
+            );
+            Object val = getDataFromModel(
+                env,
+                field,
+                context.getRoot().scenario(),
+                context.getRoot().testcase(),
+                iter,
+                subIter
+            );
+            if (val == null) {
+                val =
+                    getDataFromModel(
+                        def,
+                        field,
+                        context.getRoot().scenario(),
+                        context.getRoot().testcase(),
+                        iter,
+                        subIter
+                    );
+                val =
+                    getDataFromModel(
+                        def,
+                        field,
+                        context.getRoot().scenario(),
+                        context.getRoot().testcase(),
+                        iter,
+                        subIter
+                    );
+                if (val == null) {
+                    val =
+                        getDataFromModel(
+                            env,
+                            field,
+                            context.scenario(),
+                            context.testcase(),
+                            iter,
+                            subIter
+                        );
+                    val =
+                        getDataFromModel(
+                            env,
+                            field,
+                            context.scenario(),
+                            context.testcase(),
+                            iter,
+                            subIter
+                        );
+                    if (val == null) {
+                        val =
+                            getDataFromModel(
+                                def,
+                                field,
+                                context.scenario(),
+                                context.testcase(),
+                                iter,
+                                subIter
+                            );
+                        val =
+                            getDataFromModel(
+                                def,
+                                field,
+                                context.scenario(),
+                                context.testcase(),
+                                iter,
+                                subIter
+                            );
+                    }
+                }
+            }
+            return val;
+        } else {
+            return getData(context, def, field, iter, subIter);
+        }
+    }
+
+    /**
+     * resolves test data
+     *
+     * check for Testcase+env else Testcase+default environment if not available
+     * check for reusable+env else Reusable+default environment
+     *
+     * @param env the data model for execution environment
+     * @param def the data model for default environment
+     * @param gid global data id
+     * @param field the column/field name
+     * @return the data value
+     */
+    private static Object getDynamicLoopData(
         TestCaseRunner context,
         TestDataModel env,
         TestDataModel def,
@@ -369,7 +549,7 @@ public class DataAccess extends DataAccessInternal {
             }
             return val;
         } else {
-            return getData(context, def, field, iter, subIter);
+            return getDynamicLoopData(context, def, field, iter, subIter);
         }
     }
 
@@ -394,7 +574,38 @@ public class DataAccess extends DataAccessInternal {
         String iter,
         String subIter
     ) {
+    private static boolean putData(
+        TestCaseRunner context,
+        TestDataModel env,
+        TestDataModel def,
+        String field,
+        String newVal,
+        String iter,
+        String subIter
+    ) {
         if (notNull(env) && env.hasColumn(field)) {
+            return (
+                putDataToModel(
+                    env,
+                    def,
+                    field,
+                    newVal,
+                    context.getRoot().scenario(),
+                    context.getRoot().testcase(),
+                    iter,
+                    subIter
+                ) ||
+                putDataToModel(
+                    env,
+                    def,
+                    field,
+                    newVal,
+                    context.scenario(),
+                    context.testcase(),
+                    iter,
+                    subIter
+                )
+            );
             return (
                 putDataToModel(
                     env,
@@ -439,6 +650,13 @@ public class DataAccess extends DataAccessInternal {
         String iter,
         String subIter
     ) {
+    private static Object getData(
+        TestCaseRunner context,
+        TestDataModel def,
+        String field,
+        String iter,
+        String subIter
+    ) {
         if (notNull(def) && def.hasColumn(field)) {
             return Objects.toString(
                 getDataFromModel(
@@ -456,6 +674,36 @@ public class DataAccess extends DataAccessInternal {
     }
 
     /**
+     * resolves test data for default model
+     *
+     * check for Testcase + env else Reusable+default environment
+     *
+     * @param def the data model for default environment
+     * @param field the column/field name
+     * @param subIter the sub iteration value
+     * @return the data value
+     */
+    private static Object getDynamicLoopData(
+        TestCaseRunner context,
+        TestDataModel def,
+        String field,
+        String iter,
+        String subIter
+    ) {
+        if (notNull(def) && def.hasColumn(field)) {
+            return getDataFromModel(
+                def,
+                field,
+                context.scenario(),
+                context.testcase(),
+                iter,
+                subIter
+            );
+        }
+        return null;
+    }
+
+    /**
      * update data for default model
      *
      * check for Testcase+env else Reusable+default environment
@@ -465,6 +713,36 @@ public class DataAccess extends DataAccessInternal {
      * @param subIter the sub iteration value
      * @return the data value
      */
+    private static boolean putData(
+        TestCaseRunner context,
+        TestDataModel model,
+        String field,
+        String newVal,
+        String iter,
+        String subIter
+    ) {
+        return (
+            notNull(model) &&
+            model.hasColumn(field) &&
+            putDataToModel(
+                model,
+                field,
+                newVal,
+                context.getRoot().scenario(),
+                context.getRoot().testcase(),
+                iter,
+                subIter
+            ) ||
+            putDataToModel(
+                model,
+                field,
+                newVal,
+                context.scenario(),
+                context.testcase(),
+                iter,
+                subIter
+            )
+        );
     private static boolean putData(
         TestCaseRunner context,
         TestDataModel model,
