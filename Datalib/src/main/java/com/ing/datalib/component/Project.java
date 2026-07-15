@@ -398,14 +398,17 @@ public class Project {
     }
 
     /**
-     * Finds a reusable scenario by name.
+     * Finds a reusable scenario by name, excluding deleted scenarios.
      * @param name scenario name to search for (case-insensitive)
-     * @return the reusable scenario if found, null otherwise
+     * @return the reusable scenario if found and active, null otherwise
      */
     public Scenario getReusableScenarioByName(String name) {
         for (Scenario scenario : reusableScenarios) {
             if (scenario.getName().equalsIgnoreCase(name)) {
-                return scenario;
+                // Verify the scenario folder still exists on disk
+                if (new File(scenario.getLocation()).exists()) {
+                    return scenario;
+                }
             }
         }
         return null;
@@ -434,14 +437,17 @@ public class Project {
     }
 
     /**
-     * Finds a shared reusable scenario by name.
+     * Finds a shared reusable scenario by name, excluding deleted scenarios.
      * @param name scenario name to search for (case-insensitive)
-     * @return the shared reusable scenario if found, null otherwise
+     * @return the shared reusable scenario if found and active, null otherwise
      */
     public Scenario getSharedReusableScenarioByName(String name) {
         for (Scenario scenario : sharedReusableScenarios) {
             if (scenario.getName().equalsIgnoreCase(name)) {
-                return scenario;
+                // Verify the scenario folder still exists on disk
+                if (new File(scenario.getLocation()).exists()) {
+                    return scenario;
+                }
             }
         }
         return null;
@@ -965,6 +971,7 @@ public class Project {
 
     /**
      * Adds a new shared reusable scenario to the project.
+     * Checks for name uniqueness across all scopes before creating.
      * @param scenarioName name of the scenario to add
      * @return the newly created shared reusable scenario, or null if already exists in any scope
      */

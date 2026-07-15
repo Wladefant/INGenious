@@ -4,7 +4,6 @@ import com.ing.datalib.component.io.TestCaseStoreFactory;
 import com.ing.datalib.component.utils.FileUtils;
 import com.ing.datalib.component.utils.SortOrderStore;
 import com.ing.datalib.or.web.WebOR.ORScope;
-import com.ing.datalib.or.web.WebOR.ORScope;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -672,16 +671,22 @@ public class Scenario extends DataModel {
     }
 
     /**
-     * Renames this scenario.
+     * Renames this scenario in Reusable Components.
+     * Removes stale scenarios whose directories no longer exist on disk before checking uniqueness.
      * @param newName new scenario name
      * @return true if successful, false if a scenario with the new name already exists
      */
 
     public Boolean renameReusable(String newName) {
-        Scenario existing = getProject().getReusableScenarioByName(newName);
+        Project p = getProject();
+        // Clean up stale reusable scenarios first
+        List<Scenario> reusables = p.getReusableScenarios();
+        reusables.removeIf(s -> !new File(s.getLocation()).exists());
+
+        Scenario existing = p.getReusableScenarioByName(newName);
         if (existing == null || existing == this) {
             if (FileUtils.renameFile(getLocation(), newName)) {
-                getProject().refactorScenario(name, newName);
+                p.refactorScenario(name, newName);
                 name = newName;
                 return true;
             }
@@ -692,13 +697,19 @@ public class Scenario extends DataModel {
 
     /**
      * Renames this shared reusable scenario.
+     * Removes stale scenarios whose directories no longer exist on disk before checking uniqueness.
      * @param newName new scenario name
      * @return true if successful, false if a scenario with the new name already exists
      */
     public Boolean renameSharedReusable(String newName) {
-        if (getProject().getSharedReusableScenarioByName(newName) == null) {
+        Project p = getProject();
+        // Clean up stale shared reusable scenarios first
+        List<Scenario> sharedReusables = p.getSharedScenarios();
+        sharedReusables.removeIf(s -> !new File(s.getLocation()).exists());
+
+        if (p.getSharedReusableScenarioByName(newName) == null) {
             if (FileUtils.renameFile(getLocation(), newName)) {
-                getProject().refactorScenario(name, newName);
+                p.refactorScenario(name, newName);
                 name = newName;
                 return true;
             }
