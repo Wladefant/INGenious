@@ -431,6 +431,31 @@ function fail(code, msg) {
   process.exit(code);
 }
 
+/**
+ * The browser, or an honest CANNOT_TELL — never a stack trace.
+ *
+ * `npm install` puts the playwright PACKAGE on disk; the browser binaries are a separate
+ * download that its postinstall does, and that a corporate proxy can quietly prevent. The
+ * package then imports fine and `launch()` throws, which used to surface as an uncaught
+ * exception: a Node stack trace where the panel expected a sentence. Measured on a fresh
+ * clone, 2026-07-28. A browser that is not there is something we could not test WITH, not a
+ * verdict about anybody's selectors.
+ */
+async function launchOrExplain(engine, options) {
+  try {
+    return await engine.launch(options);
+  } catch (e) {
+    const first = e && e.message ? String(e.message).split('\n')[0] : String(e);
+    console.error(
+      'CANNOT TELL — playwright is installed but its browser is not, so no page could be\n' +
+        'opened and no selector was checked. Run this once in the tools/ folder of this\n' +
+        'checkout:\n\n    npx playwright install chromium\n\n' +
+        'Original message: ' + first,
+    );
+    process.exit(EXIT.CANNOT_TELL);
+  }
+}
+
 async function loadPlaywright() {
   try {
     return await import('playwright');
@@ -474,7 +499,7 @@ async function run(args) {
 
   let browser, context, page;
   try {
-    browser = await engine.launch({ headless: !args.headed });
+    browser = await launchOrExplain(engine, { headless: !args.headed });
     context = await browser.newContext(
       args.storageState ? { storageState: args.storageState } : {},
     );
@@ -547,7 +572,7 @@ async function selftest() {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const url = `http://127.0.0.1:${server.address().port}/`;
 
-  const browser = await pw.chromium.launch({ headless: true });
+  const browser = await launchOrExplain(pw.chromium, { headless: true });
   const page = await (await browser.newContext()).newPage();
   await page.goto(url);
   await page.waitForTimeout(300);

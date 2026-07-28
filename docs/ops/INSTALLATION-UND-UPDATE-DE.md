@@ -181,20 +181,25 @@ urteilen.
 
 ### Schritt 3 — Die Werkzeuge einsatzbereit machen
 
-Ein einziges Werkzeug braucht ein Paket von außen (`playwright`, für „Aufnahme prüfen"). Alle
-anderen kommen mit Node allein aus. Im Ordner `tools`:
+Ein einziges Werkzeug braucht etwas von außen (`playwright`, für „Aufnahme prüfen"). Alle
+anderen kommen mit Node allein aus. **Zwei Befehle**, im Ordner `tools`:
 
 ```
 npm install
+npx playwright install chromium
 ```
 
-**Das sehen Sie, wenn es geklappt hat** ❓
-`added N packages` und ein neuer Ordner `tools\node_modules`. Der erste Lauf lädt zusätzlich
-einen Browser herunter und dauert einige Minuten.
+**Beide, nicht nur den ersten.** `npm install` legt das Paket ab; der Browser selbst ist ein
+getrennter Download. Fehlt er, sagt „Aufnahme prüfen" genau diesen zweiten Befehl an. ✅
 
-**Wenn Sie das überspringen:** alles andere funktioniert; nur „Aufnahme prüfen" antwortet dann
-mit *„CANNOT TELL — the `playwright` package is not resolvable"* und nennt genau diesen Befehl.
-Nichts wird still falsch.
+**Das sehen Sie, wenn es geklappt hat** ✅
+`added 2 packages` und ein neuer Ordner `tools\node_modules`; danach beim zweiten Befehl eine
+Fortschrittsanzeige und `chromium ... downloaded to ...`. Der Browser-Download ist einige
+hundert MB groß und dauert beim ersten Mal ein paar Minuten.
+
+**Wenn Sie das überspringen:** alles andere funktioniert; nur „Aufnahme prüfen" antwortet mit
+*„CANNOT TELL — …"* und nennt den fehlenden Befehl. Nichts wird still falsch, und es gibt
+keinen Programmabsturz. ✅
 
 ### Schritt 4 — Sagen, welches Azure DevOps gemeint ist
 
@@ -392,9 +397,10 @@ klären** — die meisten in wenigen Minuten.
 1. **Liegt auf Ihrem Gerät ein Java 17, und wo?** Kapitel 2, Schritt 1 beantwortet das. Der
    Pfad des uns bekannten Geräts gilt ausdrücklich nicht für Ihres.
 2. **Ist git da?** Ohne git gibt es weder Kapitel 2 noch Kapitel 4.
-3. **Ist Node da, und kommt `npm install` durch?** Ohne Node erscheinen die Schaltflächen,
-   arbeiten aber nicht — Studio sagt das dann auch. Ob `npm install` hinter dem Firmen-Proxy
-   funktioniert, wissen wir nicht.
+3. **Ist Node da, und kommen `npm install` und der Browser-Download durch?** Ohne Node
+   erscheinen die Schaltflächen, arbeiten aber nicht — Studio sagt das dann auch. Ob beides
+   hinter dem Firmen-Proxy funktioniert, wissen wir nicht; scheitert der Browser-Download, ist
+   nur „Aufnahme prüfen" betroffen und sagt es auch.
 4. **Wie kommen Sie an Maven?** Auf dem uns bekannten Gerät ist es ein entpackter Ordner im
    Benutzerverzeichnis. Ob das Company Portal es anbietet, wissen wir nicht.
 5. **Funktioniert „Aus ADO aktualisieren" mit Ihrer Anmeldung?** Der Weg ist erprobt, aber
@@ -423,6 +429,7 @@ Ihnen ist ein Absatz, den die nächste Kollegin nicht mehr erlebt.
 | `ing-update` sagt, es könne nichts holen | Ihr Zweig folgt keinem Zweig auf dem Server | Melden — das ist ein Einrichtungsfehler, keiner Ihrer |
 | `ing-update` sagt „eigene Aenderungen", obwohl Sie nichts geändert haben | Sie haben tatsächlich eine Datei bearbeitet — reine Zeilenenden aus dem Bau zählen seit dem 28.07.2026 nicht mehr dazu | `git status` ansehen; die genannte Datei ist wirklich verändert |
 | „CANNOT TELL — the `playwright` package is not resolvable" | Kapitel 2, Schritt 3 wurde übersprungen | `npm install` im Ordner `tools` |
+| „CANNOT TELL — playwright is installed but its browser is not" | vom Schritt 3 wurde nur der erste Befehl ausgeführt | `npx playwright install chromium` im Ordner `tools` |
 | „Nicht eingerichtet: org fehlt" o. Ä. | Kapitel 2, Schritt 4 wurde übersprungen | `ado-config.json` anlegen |
 | Eine Schaltfläche ist grau | ein Werkzeug fehlt | Der gelbe Streifen oben sagt, welches. Kapitel 5 |
 | Die Schaltfläche `Ablauf` fehlt ganz | das Plugin liegt nicht in der Installation — **oder** Studio kam nicht aus diesem Klon | `ing-update.cmd`, dann Studio neu starten. Bleibt sie weg: Kapitel 2, Schritt 2 wiederholen |
