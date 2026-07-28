@@ -691,12 +691,29 @@ public class TestCaseComponent extends JPanel implements ActionListener {
 
         TestCase target;
         if (pluginTarget != null) {
+            // A plugin naming a target MEANS it. The name is an identity — a test case id the
+            // rest of the tester loop is filed under — so re-recording it has to land in it,
+            // not beside it. Look for the target before making one.
+            //
+            // createOrResolveTarget cannot answer that, because it is shared with the dialog,
+            // where the opposite is true: a person who types the same name twice must not
+            // overwrite their own first recording. That is a real bug and it is fixed by
+            // uniquifying there. findExistingTarget is the other half of the pair, and it is
+            // the half this path needs — and the half upstream left with no callers.
             target =
-                createOrResolveTarget(
+                findExistingTarget(
                     pluginTarget.getScenarioName(),
                     pluginTarget.getTestCaseName(),
                     pluginTarget.isReusableScenario()
                 );
+            if (target == null) {
+                target =
+                    createOrResolveTarget(
+                        pluginTarget.getScenarioName(),
+                        pluginTarget.getTestCaseName(),
+                        pluginTarget.isReusableScenario()
+                    );
+            }
         } else {
             RecordingTargetDialog.Selection selection = RecordingTargetDialog.showDialog(
                 this,
