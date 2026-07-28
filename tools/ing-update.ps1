@@ -82,6 +82,38 @@ $ProgressPreference    = 'SilentlyContinue'
 $script:Failed = @()
 $script:Stale  = @()
 
+# The tester's OWN uncommitted work, and nothing else.
+#
+# `git status --porcelain` alone was wrong here, and wrong in the way that matters: building
+# Studio rewrites a tracked file (Resources/Engine/pom.xml) with different line endings, so on
+# a Windows checkout with core.autocrlf=true a colleague who had done nothing but follow the
+# guide was told "you have your own changes, nothing was fetched" and got a red FAILED on the
+# very first run. Measured on a fresh clone, 2026-07-28.
+#
+# So each reported path is asked whether it differs in CONTENT: `git diff` normalises line
+# endings away, and a path whose diff is empty is the build's doing, not the tester's. Real
+# edits, staged changes and untracked files are still reported, because those ARE theirs and
+# losing them is the thing this check exists to prevent.
+function Get-OwnChanges($repo) {
+  $reported = @(& git -C $repo status --porcelain)
+  if (-not $reported) { return @() }
+  $mine = @()
+  foreach ($line in $reported) {
+    if ($line.Length -lt 4) { continue }
+    $code = $line.Substring(0, 2)
+    $path = $line.Substring(3).Trim('"')
+    # A rename is written "old -> new"; judge the destination.
+    if ($path -match ' -> (.+)$') { $path = $Matches[1].Trim('"') }
+    if ($code -eq '??') { $mine += $line; continue }        # untracked: definitely not ours
+    & git -C $repo diff --quiet -- $path 2>$null
+    $worktreeDiffers = ($LASTEXITCODE -ne 0)
+    & git -C $repo diff --cached --quiet -- $path 2>$null
+    $indexDiffers = ($LASTEXITCODE -ne 0)
+    if ($worktreeDiffers -or $indexDiffers) { $mine += $line }
+  }
+  return $mine
+}
+
 function Step($m) { Write-Host ''; Write-Host "== $m" -ForegroundColor Cyan }
 function Info($m) { Write-Host "   $m" }
 function Good($m) { Write-Host "   $m" -ForegroundColor Green }
@@ -211,7 +243,7 @@ if ($LASTEXITCODE -ne 0 -or -not $upstream) {
     Good "Aktuell gegenueber $upstream."
   }
 } else {
-  $dirty = (& git -C $Repo status --porcelain)
+  $dirty = Get-OwnChanges $Repo
   if ($dirty) {
     # Refuse rather than stash: a stash on somebody else's machine is a thing they will not
     # find again, and this script must never be the reason work disappears.
@@ -387,7 +419,7 @@ if ($oldStamp) { Info ("gebaut aus: " + $oldStamp) } else { Info 'gebaut aus: un
 # not that commit) AND the commit is already on a remote (otherwise a checkout can be right up
 # to date and still not have it). In every other case a WORD goes in, the panel recognises it
 # is not a hex id, and it says nothing at all. Silence beats a warning nobody can act on.
-if (& git -C $Repo status --porcelain) {
+if (Get-OwnChanges $Repo) {
   $stamp = 'dirty'
 } else {
   $head = (& git -C $Repo rev-parse HEAD).Trim()
