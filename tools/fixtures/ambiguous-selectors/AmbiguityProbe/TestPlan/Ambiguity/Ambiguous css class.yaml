@@ -1,0 +1,22 @@
+schemaVersion: 1
+testCase: Ambiguous css class
+scenario: Ambiguity
+steps:
+  - step: 1
+    object: Browser
+    description: Open the ambiguity fixture
+    action: Open
+    input: '@http://127.0.0.1:8731/'
+
+  - step: 2
+    object: PrimaryButton
+    description: Click .btn-primary (four exist)
+    action: Click
+    reference: "[Project] AmbiguityPage"
+
+  - step: 3
+    object: Ergebnis
+    description: Assert which control was hit
+    action: assertElementContainsText
+    input: geklickt
+    reference: "[Project] AmbiguityPage"

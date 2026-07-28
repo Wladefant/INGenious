@@ -1,0 +1,7 @@
+{
+  "_fixture": "First page of GET _apis/testplan/Plans/1234567/suites?api-version=7.1. The selftest transport returns this when the suites URL carries NO continuationToken param, and supplies x-ms-continuationtoken=CT-SUITES-2 so the pager fetches suites.page2.json next.",
+  "count": 1,
+  "value": [
+    { "id": 1000, "name": "Partner-Suche Suite", "suiteType": "StaticTestSuite" }
+  ]
+}

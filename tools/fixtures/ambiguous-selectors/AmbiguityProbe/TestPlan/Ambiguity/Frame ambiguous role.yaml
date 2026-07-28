@@ -1,0 +1,22 @@
+schemaVersion: 1
+testCase: Frame ambiguous role
+scenario: Ambiguity
+steps:
+  - step: 1
+    object: Browser
+    description: Open the ambiguity fixture
+    action: Open
+    input: '@http://127.0.0.1:8731/'
+
+  - step: 2
+    object: FrameSpeichern
+    description: Click the button named Speichern inside the frame (two exist)
+    action: Click
+    reference: "[Project] AmbiguityPage"
+
+  - step: 3
+    object: FrameErgebnis
+    description: Assert which control inside the frame was hit
+    action: assertElementContainsText
+    input: geklickt
+    reference: "[Project] AmbiguityPage"

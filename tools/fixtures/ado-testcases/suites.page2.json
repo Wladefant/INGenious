@@ -1,0 +1,7 @@
+{
+  "_fixture": "Second (final) page of the suites listing. The selftest transport returns this when the suites URL carries continuationToken=CT-SUITES-2, and supplies NO continuation header so the pager stops. Proves x-ms-continuationtoken pagination.",
+  "count": 1,
+  "value": [
+    { "id": 2000, "name": "Kunde-360 Suite", "suiteType": "StaticTestSuite" }
+  ]
+}

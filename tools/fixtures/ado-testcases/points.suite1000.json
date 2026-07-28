@@ -1,0 +1,12 @@
+{
+  "_fixture": "GET _apis/testplan/Plans/1234567/Suites/1000/TestPoint?api-version=7.1. One point → test case 3951650.",
+  "count": 1,
+  "value": [
+    {
+      "id": 77001,
+      "testCaseReference": { "id": 3951650, "name": "Partner-Suche + Kunde-360 (Set1)" },
+      "results": { "outcome": "Passed", "lastResultState": "Completed" },
+      "isActive": true
+    }
+  ]
+}

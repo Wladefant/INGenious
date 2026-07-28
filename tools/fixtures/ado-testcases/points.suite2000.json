@@ -1,0 +1,18 @@
+{
+  "_fixture": "GET _apis/testplan/Plans/1234567/Suites/2000/TestPoint?api-version=7.1. Two points: a NEW case 3951651, plus a DUPLICATE of 3951650 (also a member of suite 1000) so the selftest can prove de-duplication across suites.",
+  "count": 2,
+  "value": [
+    {
+      "id": 77002,
+      "testCaseReference": { "id": 3951651, "name": "Ueberweisung mit 4-Augen-Prinzip" },
+      "results": { "outcome": "NotExecuted", "lastResultState": "NotReady" },
+      "isActive": true
+    },
+    {
+      "id": 77003,
+      "testCaseReference": { "id": 3951650, "name": "Partner-Suche + Kunde-360 (Set1)" },
+      "results": { "outcome": "Passed", "lastResultState": "Completed" },
+      "isActive": true
+    }
+  ]
+}

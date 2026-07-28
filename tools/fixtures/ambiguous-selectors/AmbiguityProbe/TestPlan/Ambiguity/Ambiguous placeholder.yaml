@@ -1,0 +1,16 @@
+schemaVersion: 1
+testCase: Ambiguous placeholder
+scenario: Ambiguity
+steps:
+  - step: 1
+    object: Browser
+    description: Open the ambiguity fixture
+    action: Open
+    input: '@http://127.0.0.1:8731/'
+
+  - step: 2
+    object: KontonummerFeld
+    description: Fill the Kontonummer field (two exist)
+    action: Fill
+    input: DE00000000
+    reference: "[Project] AmbiguityPage"

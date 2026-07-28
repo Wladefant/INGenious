@@ -1,0 +1,52 @@
+schemaVersion: 1
+name: AmbiguitySet
+release: Release1
+executions:
+  - execute: true
+    testScenario: Ambiguity
+    testCase: Unique control
+    iteration: Single
+    status: Passed
+    browser: Chromium
+    browserVersion: Default
+    platform: Any
+  - execute: true
+    testScenario: Ambiguity
+    testCase: Ambiguous role name
+    iteration: Single
+    status: Failed
+    browser: Chromium
+    browserVersion: Default
+    platform: Any
+  - execute: true
+    testScenario: Ambiguity
+    testCase: Ambiguous css class
+    iteration: Single
+    status: Failed
+    browser: Chromium
+    browserVersion: Default
+    platform: Any
+  - execute: true
+    testScenario: Ambiguity
+    testCase: Ambiguous placeholder
+    iteration: Single
+    status: Failed
+    browser: Chromium
+    browserVersion: Default
+    platform: Any
+  - execute: true
+    testScenario: Ambiguity
+    testCase: Frame ambiguous css
+    iteration: Single
+    status: Passed
+    browser: Chromium
+    browserVersion: Default
+    platform: Any
+  - execute: true
+    testScenario: Ambiguity
+    testCase: Frame ambiguous role
+    iteration: Single
+    status: Failed
+    browser: Chromium
+    browserVersion: Default
+    platform: Any

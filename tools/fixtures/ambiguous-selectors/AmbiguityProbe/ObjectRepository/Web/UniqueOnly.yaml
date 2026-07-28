@@ -1,0 +1,13 @@
+# Control page: every entry below resolves to exactly one element on the fixture.
+# It exists so the tool's clean path (exit 0) is exercised, not just its failing path.
+page: UniqueOnly
+scope: PROJECT
+elements:
+  Ueberschrift:
+    role: "HEADING;Kundenverwaltung"
+  KontoAnlegen:
+    role: "BUTTON;Konto anlegen"
+  ErsteKontonummer:
+    css: "#konto-1"
+  Ergebnis:
+    css: "#out"

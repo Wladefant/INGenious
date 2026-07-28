@@ -1,0 +1,22 @@
+schemaVersion: 1
+testCase: Unique control
+scenario: Ambiguity
+steps:
+  - step: 1
+    object: Browser
+    description: Open the ambiguity fixture
+    action: Open
+    input: '@http://127.0.0.1:8731/'
+
+  - step: 2
+    object: KontoAnlegen
+    description: Click the uniquely named button
+    action: Click
+    reference: "[Project] AmbiguityPage"
+
+  - step: 3
+    object: Ergebnis
+    description: Assert the intended control was hit
+    action: assertElementContainsText
+    input: btn-anlegen
+    reference: "[Project] AmbiguityPage"
