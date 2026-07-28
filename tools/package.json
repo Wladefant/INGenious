@@ -1,0 +1,9 @@
+{
+  "name": "ingenious-qa-tools",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Dependencies of the Node tools the INGenious Studio tester panel starts. Only selector-uniqueness.mjs needs anything outside Node's standard library; run `npm install` in this folder once, and the 'Aufnahme pruefen' button works. Every other tool here is stdlib-only and needs no install at all.",
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

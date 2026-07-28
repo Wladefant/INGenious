@@ -28,7 +28,8 @@
  * "Not present on this page" is NOT a pass — an object belonging to a later screen simply
  * was not tested. If nothing could be decided, the tool exits CANNOT_TELL (2), never 0.
  *
- * Node built-ins + the `playwright` package. If playwright is missing the tool exits
+ * Node built-ins + the `playwright` package (declared in tools/package.json; run
+ * `npm install` once in that folder). If playwright is missing the tool exits
  * CANNOT_TELL, it never guesses.
  */
 
@@ -462,7 +463,8 @@ async function run(args) {
   if (!pw) {
     console.error(
       'CANNOT TELL — the `playwright` package is not resolvable from here, so no page could be\n' +
-        'opened and no selector was checked. Install it (npm i -D playwright) and re-run.',
+        'opened and no selector was checked. Run `npm install` once in the tools/ folder of\n' +
+        'this checkout (tools/package.json declares it), then press the button again.',
     );
     process.exit(EXIT.CANNOT_TELL);
   }
@@ -531,6 +533,7 @@ async function selftest() {
   const pw = await loadPlaywright();
   if (!pw) {
     console.error('SELFTEST CANNOT RUN — playwright is not resolvable. Not a pass, not a failure.');
+    console.error('Run `npm install` once in the tools/ folder of this checkout, then re-run.');
     process.exit(EXIT.CANNOT_TELL);
   }
 
