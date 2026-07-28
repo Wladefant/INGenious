@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>de.ing.qa</groupId>
+    <artifactId>ing-tester-panel</artifactId>
+    <version>0.1.0</version>
+    <packaging>jar</packaging>
+
+    <name>ING Tester Panel</name>
+    <description>
+        INGenious Studio plugin: the ING-specific tester surface (test-data picker,
+        test-case overview). Rides on the StudioPanelApi extension point, so nothing
+        ING-specific has to live in the INGenious core.
+    </description>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!--
+          The repository commit this JAR was built from, stamped into the manifest and read back
+          at runtime by de.ing.qa.panel.RepoCheck: a checkout that does not contain this commit
+          has not been updated, and the panel says so before a tester presses a dead button.
+
+          Passed in on the command line by tools/ing-update.ps1, which fills it ONLY when the
+          working tree was clean AND the commit was already reachable from a remote. Any other
+          case it passes a word instead — `dirty`, `unpublished` — and RepoCheck then makes no
+          claim at all. That asymmetry is what stops the check crying wolf: "your checkout lacks
+          this commit" can only ever mean "you have not updated", never "the builder had not
+          pushed yet".
+
+          The default below is what a bare `mvn package` produces, and it is deliberately the
+          silent one: a build that was not asked to make a claim does not make one.
+        -->
+        <ing.qa.commit>unknown</ing.qa.commit>
+    </properties>
+
+    <dependencies>
+        <!-- Provided by the host: the Studio already has it on the classpath. -->
+        <dependency>
+            <groupId>com.ing</groupId>
+            <artifactId>ingenious-api</artifactId>
+            <version>3.0</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.1</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <!--
+                              How PluginLoader finds the entry classes: comma-separated.
+
+                              ONE Studio screen, on purpose. Testdaten, Testfall wählen and
+                              Testfall-Übersicht used to be listed here too, so Studio's
+                              toolbar showed four buttons of which three are steps of the
+                              fourth — and the tester handout had to spend a paragraph saying
+                              "ignore those three". Ablauf is the way in; the other panels are
+                              still in this JAR, still built, still reachable for the
+                              automation engineers who use them singly, via ING_QA_PANELS=alle
+                              (see GuidedFlowPanel.ENV_PANELS). Studio reads panel metadata
+                              from the JAR's main attributes, which are per-JAR, so this list
+                              is the only place the choice can be made.
+                            -->
+                            <pluginEntryClasses>de.ing.qa.panel.GuidedFlowPanel,de.ing.qa.studio.AdoRecordingTarget</pluginEntryClasses>
+                            <!-- Read back at runtime by de.ing.qa.panel.RepoCheck. See the
+                                 ing.qa.commit property above for what may and may not go in
+                                 here, and why the default is the silent one. -->
+                            <Ing-Qa-Repo-Commit>${ing.qa.commit}</Ing-Qa-Repo-Commit>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,439 @@
+{
+  "tcId": "3951253",
+  "sourceDir": "C:\\Users\\wkiri\\ingenious\\ingenious-playwright-3.0.0-preview\\Projects\\Tutorial\\Results\\TestExecution\\Release1\\Set1\\21-Juli-2026 01-05-49",
+  "collectedAt": "2026-07-20T23:20:03.469Z",
+  "files": [
+    {
+      "path": "Payment Operations_Pay money to an existing contact_Single_Chromium-v2.html",
+      "sizeBytes": 73862
+    },
+    {
+      "path": "Payment Operations_Request money from existing contact_Single_Chromium-v2.html",
+      "sizeBytes": 73917
+    },
+    {
+      "path": "console.txt",
+      "sizeBytes": 327319
+    },
+    {
+      "path": "data.js",
+      "sizeBytes": 38017
+    },
+    {
+      "path": "detailed-v2.html",
+      "sizeBytes": 102049
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-11_01-09-26.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-12_01-09-56.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-13_01-10-26.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-14_01-10-57.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-15_01-11-27.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-16_01-11-57.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-18_01-12-57.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-1_01-05-54.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-2_01-05-54.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-3_01-06-25.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-4_01-06-55.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-5_01-07-26.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-6_01-07-56.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-7_01-08-26.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Pay money to an existing contact_Step-9_01-08-56.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-11_01-16-31.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-12_01-17-01.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-13_01-17-32.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-14_01-18-02.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-15_01-18-32.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-16_01-19-02.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-18_01-20-02.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-1_01-13-01.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-2_01-13-01.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-3_01-13-31.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-4_01-14-01.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-5_01-14-31.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-6_01-15-01.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-7_01-15-31.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "img/Payment Operations_Request money from existing contact_Step-9_01-16-01.png",
+      "sizeBytes": 17090
+    },
+    {
+      "path": "logs/Payment Operations_Pay money to an existing contact.txt",
+      "sizeBytes": 15617
+    },
+    {
+      "path": "logs/Payment Operations_Request money from existing contact.txt",
+      "sizeBytes": 15615
+    },
+    {
+      "path": "media/css/bootstrap.min.css",
+      "sizeBytes": 116943
+    },
+    {
+      "path": "media/css/dataTables.bootstrap.min.css",
+      "sizeBytes": 4253
+    },
+    {
+      "path": "media/css/dataTables.colVis.css",
+      "sizeBytes": 5824
+    },
+    {
+      "path": "media/css/galenReport.css",
+      "sizeBytes": 1952
+    },
+    {
+      "path": "media/css/jquery.dataTables.css",
+      "sizeBytes": 18401
+    },
+    {
+      "path": "media/css/jquery.dataTables_themeroller.css",
+      "sizeBytes": 14245
+    },
+    {
+      "path": "media/css/modern/components.css",
+      "sizeBytes": 33078
+    },
+    {
+      "path": "media/css/modern/tailwind.min.css",
+      "sizeBytes": 62574
+    },
+    {
+      "path": "media/css/modern/themes/dark.css",
+      "sizeBytes": 9553
+    },
+    {
+      "path": "media/css/modern/themes/fuchsia.css",
+      "sizeBytes": 3283
+    },
+    {
+      "path": "media/css/modern/themes/indigo.css",
+      "sizeBytes": 2759
+    },
+    {
+      "path": "media/css/modern/themes/light.css",
+      "sizeBytes": 4373
+    },
+    {
+      "path": "media/css/modern/themes/orange.css",
+      "sizeBytes": 2948
+    },
+    {
+      "path": "media/css/modern/themes/sky.css",
+      "sizeBytes": 2658
+    },
+    {
+      "path": "media/css/newReport.css",
+      "sizeBytes": 897
+    },
+    {
+      "path": "media/css/perf.css",
+      "sizeBytes": 7437
+    },
+    {
+      "path": "media/css/report.css",
+      "sizeBytes": 9257
+    },
+    {
+      "path": "media/css/select2.min.css",
+      "sizeBytes": 14776
+    },
+    {
+      "path": "media/css/vendor/tabulator_simple.min.css",
+      "sizeBytes": 29377
+    },
+    {
+      "path": "media/fonts/Lato-Regular.ttf",
+      "sizeBytes": 120196
+    },
+    {
+      "path": "media/fonts/glyphicons-halflings-regular.eot",
+      "sizeBytes": 20335
+    },
+    {
+      "path": "media/fonts/glyphicons-halflings-regular.svg",
+      "sizeBytes": 62927
+    },
+    {
+      "path": "media/fonts/glyphicons-halflings-regular.ttf",
+      "sizeBytes": 41280
+    },
+    {
+      "path": "media/fonts/glyphicons-halflings-regular.woff",
+      "sizeBytes": 23320
+    },
+    {
+      "path": "media/fonts/glyphicons-halflings-regular.woff2",
+      "sizeBytes": 23320
+    },
+    {
+      "path": "media/fonts/vendor/inter/Inter-Bold.woff2",
+      "sizeBytes": 22792
+    },
+    {
+      "path": "media/fonts/vendor/inter/Inter-Medium.woff2",
+      "sizeBytes": 22820
+    },
+    {
+      "path": "media/fonts/vendor/inter/Inter-Regular.woff2",
+      "sizeBytes": 21564
+    },
+    {
+      "path": "media/fonts/vendor/inter/Inter-SemiBold.woff2",
+      "sizeBytes": 22904
+    },
+    {
+      "path": "media/images/Sorting icons.psd",
+      "sizeBytes": 27490
+    },
+    {
+      "path": "media/images/back_disabled.png",
+      "sizeBytes": 345
+    },
+    {
+      "path": "media/images/back_enabled.png",
+      "sizeBytes": 453
+    },
+    {
+      "path": "media/images/back_enabled_hover.png",
+      "sizeBytes": 450
+    },
+    {
+      "path": "media/images/bdd.svg",
+      "sizeBytes": 679
+    },
+    {
+      "path": "media/images/favicon.png",
+      "sizeBytes": 3661
+    },
+    {
+      "path": "media/images/forward_disabled.png",
+      "sizeBytes": 335
+    },
+    {
+      "path": "media/images/forward_enabled.png",
+      "sizeBytes": 445
+    },
+    {
+      "path": "media/images/forward_enabled_hover.png",
+      "sizeBytes": 444
+    },
+    {
+      "path": "media/images/log.png",
+      "sizeBytes": 548
+    },
+    {
+      "path": "media/images/poll.svg",
+      "sizeBytes": 285
+    },
+    {
+      "path": "media/images/sort_asc.png",
+      "sizeBytes": 263
+    },
+    {
+      "path": "media/images/sort_asc_disabled.png",
+      "sizeBytes": 252
+    },
+    {
+      "path": "media/images/sort_both.png",
+      "sizeBytes": 282
+    },
+    {
+      "path": "media/images/sort_desc.png",
+      "sizeBytes": 260
+    },
+    {
+      "path": "media/images/sort_desc_disabled.png",
+      "sizeBytes": 251
+    },
+    {
+      "path": "media/images/video.png",
+      "sizeBytes": 435
+    },
+    {
+      "path": "media/js/angular.min.js",
+      "sizeBytes": 159999
+    },
+    {
+      "path": "media/js/bootstrap.min.js",
+      "sizeBytes": 37045
+    },
+    {
+      "path": "media/js/dataTables.colVis.js",
+      "sizeBytes": 26544
+    },
+    {
+      "path": "media/js/detailed.js",
+      "sizeBytes": 60923
+    },
+    {
+      "path": "media/js/galenReport.js",
+      "sizeBytes": 7316
+    },
+    {
+      "path": "media/js/isinViewport.js",
+      "sizeBytes": 6625
+    },
+    {
+      "path": "media/js/jquery.dataTables.min.js",
+      "sizeBytes": 140941
+    },
+    {
+      "path": "media/js/jquery.js",
+      "sizeBytes": 87532
+    },
+    {
+      "path": "media/js/modern/lib-loader.js",
+      "sizeBytes": 3470
+    },
+    {
+      "path": "media/js/modern/report-app.js",
+      "sizeBytes": 28164
+    },
+    {
+      "path": "media/js/perf.js",
+      "sizeBytes": 23329
+    },
+    {
+      "path": "media/js/select2.full.min.js",
+      "sizeBytes": 68086
+    },
+    {
+      "path": "media/js/summary.js",
+      "sizeBytes": 12372
+    },
+    {
+      "path": "media/js/vendor/alpine-collapse.min.js",
+      "sizeBytes": 1448
+    },
+    {
+      "path": "media/js/vendor/alpine.min.js",
+      "sizeBytes": 46347
+    },
+    {
+      "path": "media/js/vendor/chart.umd.min.js",
+      "sizeBytes": 205399
+    },
+    {
+      "path": "media/js/vendor/tabulator.min.js",
+      "sizeBytes": 437329
+    },
+    {
+      "path": "media/js/video.js",
+      "sizeBytes": 2471
+    },
+    {
+      "path": "media/theme/Fuchsia.css",
+      "sizeBytes": 1463
+    },
+    {
+      "path": "media/theme/Indigo.css",
+      "sizeBytes": 1523
+    },
+    {
+      "path": "media/theme/Orange.css",
+      "sizeBytes": 1462
+    },
+    {
+      "path": "media/theme/Sky.css",
+      "sizeBytes": 1440
+    },
+    {
+      "path": "summary-v2.html",
+      "sizeBytes": 42542
+    },
+    {
+      "path": "traces/Payment Operations_Pay money to an existing contact_01-12-57/traces.zip",
+      "sizeBytes": 184146
+    },
+    {
+      "path": "traces/Payment Operations_Request money from existing contact_01-20-02/traces.zip",
+      "sizeBytes": 183988
+    }
+  ]
+}

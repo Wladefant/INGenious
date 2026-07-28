@@ -40,3 +40,5 @@ Thumbs.db
 
 # other files
 recent.items
+# Selftest output (ado-automark --selftest writes its dry-run plan here).
+/generated/

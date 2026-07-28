@@ -1,0 +1,126 @@
+Run Information
+========================
+INGenious Playwright Studio                :  3.0.0-preview
+java.runtime.name                          :  OpenJDK Runtime Environment
+java.version                               :  21.0.10
+java.home                                  :  C:\Program Files\Microsoft\jdk-21.0.10.7-hotspot
+os.name                                    :  Windows 11
+os.arch                                    :  amd64
+os.version                                 :  10.0
+file.encoding                              :  UTF-8
+========================
+Run Started on Tue Jul 21 15:07:35 CEST 2026
+
+Scenario         :  [Payment Operations]
+TestCase         :  [Pay money to an existing contact]
+Browser          :  [Chromium]
+Browser Version  :  [Default]
+Platform         :  [Any]
+----------------------------------------------------------
+Initializing Report
+Running Iteration :  [Single]
+
+
+===================================================================================================
+
+Step:1  |  Object:Browser  |  Action:Open  |  Input:Login:URL  |  Condition:  | @21-Juli-2026 15:07:51.027
+[DONE]   | Opened Url: http://localhost:3000/signin
+
+
+===================================================================================================
+
+Step:2  |  Object:Username  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 15:07:51.156
+[DONE]   | Clicking on [Username]
+
+
+===================================================================================================
+
+Step:3  |  Object:Username  |  Action:Fill  |  Input:%username%  |  Condition:  | @21-Juli-2026 15:07:51.233
+[DONE]   | Entered Text 'Heath93' on '[Username]'
+
+
+===================================================================================================
+
+Step:4  |  Object:Password  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 15:07:51.308
+[DONE]   | Clicking on [Password]
+
+
+===================================================================================================
+
+Step:5  |  Object:Password  |  Action:Fill  |  Input:%pwd%  |  Condition:  | @21-Juli-2026 15:07:51.358
+[DONE]   | Entered Text 's3cret' on '[Password]'
+
+
+===================================================================================================
+
+Step:6  |  Object:signin-submit  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 15:07:51.445
+[DONE]   | Clicking on [signin-submit]
+
+
+===================================================================================================
+
+Step:7  |  Object:Browser  |  Action:StoreStorageState  |  Input:@./login.json  |  Condition:  | @21-Juli-2026 15:07:51.460
+[DONE]   | Storage State successfully stored 
+
+
+===================================================================================================
+
+Step:1  |  Object:nav-top-new-transaction  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 15:07:51.847
+[DONE]   | Clicking on [nav-top-new-transaction]
+
+
+===================================================================================================
+
+Step:2  |  Object:Recipient  |  Action:setObjectProperty  |  Input:Transaction:Recipient  |  Condition:#name  | @21-Juli-2026 15:07:51.856
+[DONE]   | Setting Object Property for #name with Kristian Bradtke for Object [[Project] Myfirstscript - Recipient]
+
+
+===================================================================================================
+
+Step:3  |  Object:Recipient  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 15:07:51.997
+[DONE]   | Clicking on [Recipient]
+
+
+===================================================================================================
+
+Step:4  |  Object:Amount  |  Action:Fill  |  Input:Transaction:Amount  |  Condition:  | @21-Juli-2026 15:07:52.061
+[DONE]   | Entered Text '$50' on '[Amount]'
+
+
+===================================================================================================
+
+Step:5  |  Object:Add a note  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 15:07:52.129
+[DONE]   | Clicking on [Add a note]
+
+
+===================================================================================================
+
+Step:6  |  Object:Add a note  |  Action:Fill  |  Input:Transaction:Text for note  |  Condition:  | @21-Juli-2026 15:07:52.172
+[DONE]   | Entered Text 'Lunch' on '[Add a note]'
+
+
+===================================================================================================
+
+Step:1  |  Object:transaction-payment  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 15:07:52.285
+[DONE]   | Clicking on [transaction-payment]
+
+
+===================================================================================================
+
+Step:1  |  Object:Transaction Submitted!  |  Action:assertElementIsVisible  |  Input:  |  Condition:  | @21-Juli-2026 15:07:52.499
+[PASS]   | [Transaction Submitted!] is visible
+
+
+===================================================================================================
+
+Step:1  |  Object:sidenav-signout  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 15:07:52.614
+[DONE]   | Clicking on [sidenav-signout]
+
+---------------------------------------------------
+Testcase Name        : Payment Operations:Pay money to an existing contact
+Executed Steps       : 16
+Passed Steps         : 16
+Failed Steps         : 0
+Time Taken           : 00:00:18
+---------------------------------------------------
+

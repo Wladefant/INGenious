@@ -1,0 +1,395 @@
+Run Information
+========================
+INGenious Playwright Studio engine : 3.0.0-preview
+java.runtime.name    : OpenJDK Runtime Environment
+java.version         : 21.0.10
+java.home            : C:\Program Files\Microsoft\jdk-21.0.10.7-hotspot
+os.name              : Windows 11
+os.arch              : amd64
+os.version           : 10.0
+file.encoding        : UTF-8
+========================
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║   ██╗███╗   ██╗ ██████╗ ███████╗███╗   ██╗██╗ ██████╗ ██╗   ██╗███████╗      ║
+║   ██║████╗  ██║██╔════╝ ██╔════╝████╗  ██║██║██╔═══██╗██║   ██║██╔════╝      ║
+║   ██║██╔██╗ ██║██║  ███╗█████╗  ██╔██╗ ██║██║██║   ██║██║   ██║███████╗      ║
+║   ██║██║╚██╗██║██║   ██║██╔══╝  ██║╚██╗██║██║██║   ██║██║   ██║╚════██║      ║
+║   ██║██║ ╚████║╚██████╔╝███████╗██║ ╚████║██║╚██████╔╝╚██████╔╝███████║      ║
+║   ╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝╚═╝ ╚═════╝  ╚═════╝ ╚══════╝      ║
+║                                                                              ║
+║                    🚀 Test Automation Framework v2.3.1                       ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+══════════════════════════════════════════════════════════════════════════════
+  📁 Project:  Tutorial
+  🌐 Browser:  Chromium
+  💻 Platform: Windows 11
+══════════════════════════════════════════════════════════════════════════════
+
+[Scenario:Payment Operations] [TestCase: Pay money to an existing contact] [Description: Pay money to an existing contact] [Browser: Chromium] [BrowserVersion: Default] [Platform: Windows 11][ExistingBrowser: false]
+[Scenario:Payment Operations] [TestCase: Request money from existing contact] [Description: Request money from existing contact] [Browser: Chromium] [BrowserVersion: Default] [Platform: Windows 11][ExistingBrowser: false]
+----------------------------------------------------------
+[2] TestCases selected for execution from [//Release1/Set1]
+----------------------------------------------------------
+[main] INFO com.ing.engine.core.TMIntegration - TM integration disabled for the testset
+testset : Set1
+
+🚀 Launching Chromium
+
+🚀 Launching Local Driver 
+
+Tracing Started
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:1   | Object: Browser | Action: Open | Input: Login:URL | Condition:  | @21-Juli-2026 15:07:47.075
+Executing method: Open
+[DONE]   | Opened Url: http://localhost:3000/signin 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:2   | Object: Username | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:51.031
+Executing method: Click
+[DONE]   | Clicking on [Username] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:3   | Object: Username | Action: Fill | Input: %username% | Condition:  | @21-Juli-2026 15:07:51.157
+%username% changed to Heath93
+Executing method: Fill
+[DONE]   | Entered Text 'Heath93' on '[Username]' 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:4   | Object: Password | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:51.234
+Executing method: Click
+[DONE]   | Clicking on [Password] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:5   | Object: Password | Action: Fill | Input: %pwd% | Condition:  | @21-Juli-2026 15:07:51.309
+%pwd% changed to s3cret
+Executing method: Fill
+[DONE]   | Entered Text 's3cret' on '[Password]' 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:6   | Object: signin-submit | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:51.358
+Executing method: Click
+[DONE]   | Clicking on [signin-submit] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:7   | Object: Browser | Action: StoreStorageState | Input: @./login.json | Condition:  | @21-Juli-2026 15:07:51.446
+Executing method: StoreStorageState
+[DONE]   | Storage State successfully stored  🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:1   | Object: nav-top-new-transaction | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:51.463
+Executing method: Click
+[DONE]   | Clicking on [nav-top-new-transaction] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:2   | Object: Recipient | Action: setObjectProperty | Input: Transaction:Recipient | Condition: #name | @21-Juli-2026 15:07:51.848
+Executing method: setObjectProperty
+[DONE]   | Setting Object Property for #name with Kristian Bradtke for Object [[Project] Myfirstscript - Recipient] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:3   | Object: Recipient | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:51.856
+Executing method: Click
+[DONE]   | Clicking on [Recipient] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:4   | Object: Amount | Action: Fill | Input: Transaction:Amount | Condition:  | @21-Juli-2026 15:07:51.998
+Executing method: Fill
+[DONE]   | Entered Text '$50' on '[Amount]' 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:5   | Object: Add a note | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:52.062
+Executing method: Click
+[DONE]   | Clicking on [Add a note] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:6   | Object: Add a note | Action: Fill | Input: Transaction:Text for note | Condition:  | @21-Juli-2026 15:07:52.129
+Executing method: Fill
+[DONE]   | Entered Text 'Lunch' on '[Add a note]' 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:1   | Object: transaction-payment | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:52.175
+Executing method: Click
+[DONE]   | Clicking on [transaction-payment] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:1   | Object: Transaction Submitted! | Action: assertElementIsVisible | Input:  | Condition:  | @21-Juli-2026 15:07:52.288
+Executing method: assertElementIsVisible
+[PASS]   | [Transaction Submitted!] is visible ✅
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:1   | Object: sidenav-signout | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:52.570
+Executing method: Click
+[DONE]   | Clicking on [sidenav-signout] 🟢
+
+===================================================================================================
+
+Tracing Stopped
+Playwright [Chromium] closed for Iteration 1
+
+---------------------------------------------------
+Testcase Name        : Payment Operations:Pay money to an existing contact
+Executed Steps       : 16
+Passed Steps         : 16
+Failed Steps         : 0
+Time Taken           : 00:00:18
+-----------------------------------------------------
+
+══════════════════════════════════════════════════════════════════════════════
+✅ Test Case: Payment Operations:Pay money to an existing contact | Status: PASS | Time: 00:00:18
+══════════════════════════════════════════════════════════════════════════════
+
+
+🚀 Launching Chromium
+
+🚀 Launching Local Driver 
+
+Tracing Started
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:1   | Object: Browser | Action: Open | Input: Login:URL | Condition:  | @21-Juli-2026 15:07:54.532
+Executing method: Open
+[DONE]   | Opened Url: http://localhost:3000/signin 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:2   | Object: Username | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:55.336
+Executing method: Click
+[DONE]   | Clicking on [Username] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:3   | Object: Username | Action: Fill | Input: %username% | Condition:  | @21-Juli-2026 15:07:55.452
+%username% changed to Heath93
+Executing method: Fill
+[DONE]   | Entered Text 'Heath93' on '[Username]' 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:4   | Object: Password | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:55.507
+Executing method: Click
+[DONE]   | Clicking on [Password] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:5   | Object: Password | Action: Fill | Input: %pwd% | Condition:  | @21-Juli-2026 15:07:55.554
+%pwd% changed to s3cret
+Executing method: Fill
+[DONE]   | Entered Text 's3cret' on '[Password]' 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:6   | Object: signin-submit | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:55.589
+Executing method: Click
+[DONE]   | Clicking on [signin-submit] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:7   | Object: Browser | Action: StoreStorageState | Input: @./login.json | Condition:  | @21-Juli-2026 15:07:55.652
+Executing method: StoreStorageState
+[DONE]   | Storage State successfully stored  🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:1   | Object: nav-top-new-transaction | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:55.658
+Executing method: Click
+[DONE]   | Clicking on [nav-top-new-transaction] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:2   | Object: Recipient | Action: setObjectProperty | Input: Transaction:Recipient | Condition: #name | @21-Juli-2026 15:07:55.983
+Executing method: setObjectProperty
+[DONE]   | Setting Object Property for #name with Darrel Ortiz for Object [[Project] Myfirstscript - Recipient] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:3   | Object: Recipient | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:55.986
+Executing method: Click
+[DONE]   | Clicking on [Recipient] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:4   | Object: Amount | Action: Fill | Input: Transaction:Amount | Condition:  | @21-Juli-2026 15:07:56.079
+Executing method: Fill
+[DONE]   | Entered Text '$30' on '[Amount]' 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:5   | Object: Add a note | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:56.124
+Executing method: Click
+[DONE]   | Clicking on [Add a note] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:6   | Object: Add a note | Action: Fill | Input: Transaction:Text for note | Condition:  | @21-Juli-2026 15:07:56.172
+Executing method: Fill
+[DONE]   | Entered Text 'Dinner' on '[Add a note]' 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:1   | Object: transaction-request | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:56.216
+Executing method: Click
+[DONE]   | Clicking on [transaction-request] 🟢
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:1   | Object: Transaction Submitted! | Action: assertElementIsVisible | Input:  | Condition:  | @21-Juli-2026 15:07:56.310
+Executing method: assertElementIsVisible
+[PASS]   | [Transaction Submitted!] is visible ✅
+
+===================================================================================================
+
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔵 Step:1   | Object: sidenav-signout | Action: Click | Input:  | Condition:  | @21-Juli-2026 15:07:56.595
+Executing method: Click
+[DONE]   | Clicking on [sidenav-signout] 🟢
+
+===================================================================================================
+
+Tracing Stopped
+Playwright [Chromium] closed for Iteration 1
+
+---------------------------------------------------
+Testcase Name        : Payment Operations:Request money from existing contact
+Executed Steps       : 16
+Passed Steps         : 16
+Failed Steps         : 0
+Time Taken           : 00:00:03
+-----------------------------------------------------
+
+══════════════════════════════════════════════════════════════════════════════
+✅ Test Case: Payment Operations:Request money from existing contact | Status: PASS | Time: 00:00:03
+══════════════════════════════════════════════════════════════════════════════
+
+Run Finished on Tue Jul 21 15:07:57 CEST 2026
+-----------------------------------------------------
+ExecutionDate        : 21-Juli-2026 15-07-34
+Executed TestCases   : 2
+Passed TestCases     : 2
+Failed TestCases     : 0
+Time Taken           : 00:00:22
+ReportPath           : file:///Projects/Tutorial\Results\TestExecution\Release1\Set1\21-Juli-2026 15-07-34\summary-v2.html
+-----------------------------------------------------
+[main] INFO com.ing.engine.support.DesktopApi - Trying to Open - C:\Users\wkiri\ingenious\ingenious-playwright-3.0.0-preview\Projects\Tutorial\Results\TestExecution\Release1\Set1\21-Juli-2026 15-07-34\summary-v2.html
+[main] INFO com.ing.engine.support.DesktopApi - Trying to exec: [explorer] [%s] [C:\Users\wkiri\ingenious\ingenious-playwright-3.0.0-preview\Projects\Tutorial\Results\TestExecution\Release1\Set1\21-Juli-2026 15-07-34\summary-v2.html]
+
+╔═════════════════════════════════════════════════════════════════════════════╗
+║                           🏁 EXECUTION SUMMARY 🏁                           ║
+╠═════════════════════════════════════════════════════════════════════════════╣
+║  📊 Total Tests:  2                                                         ║
+║  ✅ Passed:       2                                                         ║
+║  ❌ Failed:       0                                                         ║
+║  ⏱️  Duration:     0m 22s                                                   ║
+╠═════════════════════════════════════════════════════════════════════════════╣
+║  Overall Status: ✅ PASSED                                                  ║
+╚═════════════════════════════════════════════════════════════════════════════╝
+

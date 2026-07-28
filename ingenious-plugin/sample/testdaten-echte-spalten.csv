@@ -1,0 +1,7 @@
+Variante_KND;Kbo5 Bonitaet S;Kbo5 Zusatzinfo;Kbo5 Personen Nr;Part Nr;Part Partnertyp Kz;Kontonummer;Produktvariante Pzm;Part Geburtsdatum;MDJ_KND;EZB;Legi Status Kz;Verf Bez;Vest Bez;ZUDA TAN_LISTE;ZUDA APP;ZUDA M_TAN
+V001;21;;900000001;800000001;P;1000000001;Girokonto;01.01.1980;N;107;5;INTB;Internetbanking Aktiv(Kunde hat PIN/TAN);N;J;N
+V002;62;;900000002;800000002;G;1000000002;Extra-Konto;02.02.1975;N;22;0;PBTN;Postbox-Teilnahme aktiv;N;N;N
+V003;66;;900000003;800000003;P;1000000003;Rahmenkredit;03.03.1990;J;107;5;INTB;Internetbanking gesperrt (admin.);N;J;J
+V004;4;;900000004;800000004;J;1000000004;Girokonto Junior;04.04.2012;N;64;1;PBTN;Postbox-Teilnahme inaktiv;N;N;N
+V005;51;;900000005;800000005;P;1000000005;Annuitäten Darlehen;05.05.1968;N;107;23;INTB;Internetb. inaktiv (Kd will keine Teiln);N;J;N
+V006;21;;900000006;800000006;P;9999999999;Girokonto;06.06.1971;N;107;5;INTB;Internetbanking Aktiv(Kunde hat PIN/TAN);N;N;N

@@ -1,0 +1,296 @@
+Run Information
+========================
+INGenious Playwright Studio                :  3.0.0-preview
+java.runtime.name                          :  OpenJDK Runtime Environment
+java.version                               :  21.0.10
+java.home                                  :  C:\Program Files\Microsoft\jdk-21.0.10.7-hotspot
+os.name                                    :  Windows 11
+os.arch                                    :  amd64
+os.version                                 :  10.0
+file.encoding                              :  UTF-8
+========================
+Run Started on Tue Jul 21 01:05:49 CEST 2026
+
+Scenario         :  [Payment Operations]
+TestCase         :  [Pay money to an existing contact]
+Browser          :  [Chromium]
+Browser Version  :  [Default]
+Platform         :  [Any]
+----------------------------------------------------------
+Initializing Report
+Running Iteration :  [Single]
+
+
+===================================================================================================
+
+Step:1  |  Object:Browser  |  Action:Open  |  Input:Login:URL  |  Condition:  | @21-Juli-2026 01:05:54.006
+[FAIL]   | Error {
+  message='net::ERR_CONNECTION_REFUSED at http://localhost:3000/signin
+  name='Error
+  stack='Error: net::ERR_CONNECTION_REFUSED at http://localhost:3000/signin
+    at FrameSession._navigate (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\chromium\crPage.js:465:13)
+    at async Frame.gotoImpl (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\frames.js:523:28)
+}
+Call log:
+-   - navigating to "http://localhost:3000/signin", waiting until "load"
+
+
+
+===================================================================================================
+
+Step:1  |  Object:Browser  |  Action:Open  |  Input:Login:URL  |  Condition:  | @21-Juli-2026 01:05:54.165
+[FAIL]   | Error {
+  message='net::ERR_CONNECTION_REFUSED at http://localhost:3000/signin
+  name='Error
+  stack='Error: net::ERR_CONNECTION_REFUSED at http://localhost:3000/signin
+    at FrameSession._navigate (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\chromium\crPage.js:465:13)
+    at async Frame.gotoImpl (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\frames.js:523:28)
+}
+Call log:
+-   - navigating to "http://localhost:3000/signin", waiting until "load"
+
+
+
+===================================================================================================
+
+Step:2  |  Object:Username  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 01:06:25.653
+[FAIL]   | Error: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for getByLabel("Username")
+
+
+
+===================================================================================================
+
+Step:3  |  Object:Username  |  Action:Fill  |  Input:%username%  |  Condition:  | @21-Juli-2026 01:06:55.899
+[FAIL]   | Error: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for getByLabel("Username")
+
+
+
+===================================================================================================
+
+Step:4  |  Object:Password  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 01:07:26.083
+[FAIL]   | Error: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for getByLabel("Password")
+
+
+
+===================================================================================================
+
+Step:5  |  Object:Password  |  Action:Fill  |  Input:%pwd%  |  Condition:  | @21-Juli-2026 01:07:56.240
+[FAIL]   | Error: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for getByLabel("Password")
+
+
+
+===================================================================================================
+
+Step:6  |  Object:signin-submit  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 01:08:26.517
+[FAIL]   | Error: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for locator("[data-test=\"signin-submit\"]")
+
+
+
+===================================================================================================
+
+Step:7  |  Object:Browser  |  Action:StoreStorageState  |  Input:@./login.json  |  Condition:  | @21-Juli-2026 01:08:26.637
+[DONE]   | Storage State successfully stored 
+
+
+===================================================================================================
+
+Step:1  |  Object:nav-top-new-transaction  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 01:08:56.652
+[FAIL]   | Error: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for locator("[data-test=\"nav-top-new-transaction\"]")
+
+
+
+===================================================================================================
+
+Step:2  |  Object:Recipient  |  Action:setObjectProperty  |  Input:Transaction:Recipient  |  Condition:#name  | @21-Juli-2026 01:08:56.745
+[DONE]   | Setting Object Property for #name with Kristian Bradtke for Object [[Project] Myfirstscript - Recipient]
+
+
+===================================================================================================
+
+Step:3  |  Object:Recipient  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 01:09:26.761
+[FAIL]   | Error: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for getByText("Kristian Bradtke")
+
+
+
+===================================================================================================
+
+Step:4  |  Object:Amount  |  Action:Fill  |  Input:Transaction:Amount  |  Condition:  | @21-Juli-2026 01:09:56.849
+[FAIL]   | Error: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for getByPlaceholder("Amount")
+
+
+
+===================================================================================================
+
+Step:5  |  Object:Add a note  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 01:10:26.979
+[FAIL]   | Error: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for getByPlaceholder("Add a note")
+
+
+
+===================================================================================================
+
+Step:6  |  Object:Add a note  |  Action:Fill  |  Input:Transaction:Text for note  |  Condition:  | @21-Juli-2026 01:10:57.101
+[FAIL]   | Error: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for getByPlaceholder("Add a note")
+
+
+
+===================================================================================================
+
+Step:1  |  Object:transaction-payment  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 01:11:27.214
+[FAIL]   | Error: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for locator("[data-test=\"transaction-create-submit-payment\"]")
+
+
+
+===================================================================================================
+
+Step:1  |  Object:Transaction Submitted!  |  Action:assertElementIsVisible  |  Input:  |  Condition:  | @21-Juli-2026 01:11:57.331
+[FAIL]   | Unique Element [Transaction Submitted!] not found on Page. Error :Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for getByText("Transaction Submitted!")
+
+
+
+===================================================================================================
+
+Step:1  |  Object:Transaction Submitted!  |  Action:assertElementIsVisible  |  Input:  |  Condition:  | @21-Juli-2026 01:12:27.469
+[DEBUG]   | com.microsoft.playwright.TimeoutError: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for getByText("Transaction Submitted!")
+
+
+
+===================================================================================================
+
+Step:1  |  Object:sidenav-signout  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 01:12:57.479
+[FAIL]   | Error: Error {
+  message='Timeout 30000ms exceeded.
+  name='TimeoutError
+  stack='TimeoutError: Timeout 30000ms exceeded.
+    at ProgressController.run (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\progress.js:86:28)
+    at FrameDispatcher._runCommand (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:91:31)
+    at DispatcherConnection.dispatch (C:\Users\wkiri\AppData\Local\Temp\playwright-java-4798652640016263351\package\lib\server\dispatchers\dispatcher.js:325:39)
+}
+Call log:
+-   - waiting for locator("[data-test=\"sidenav-signout\"]")
+
+
+---------------------------------------------------
+Testcase Name        : Payment Operations:Pay money to an existing contact
+Executed Steps       : 18
+Passed Steps         : 2
+Failed Steps         : 16
+Time Taken           : 00:07:08
+---------------------------------------------------
+

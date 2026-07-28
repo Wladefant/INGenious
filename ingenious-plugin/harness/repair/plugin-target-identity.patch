@@ -1,0 +1,123 @@
+The repair for plugin target identity — NOT YET APPLIED, and deliberately so.
+
+WHAT IT DOES
+
+  Two statements in the plugin branch of TestCaseComponent.record(): ask
+  findExistingTarget for the target the plugin named, and only fall back to
+  createOrResolveTarget when there is not one yet.
+
+WHY IT IS A PATCH AND NOT A COMMIT
+
+  The change belongs in INGenious/, which is a submodule this lane was told to
+  read and build but not to modify or re-pin — three lanes are working against
+  that base and its pin move is a decision with a re-proof list attached
+  (https://github.com/Wladefant/ing-qa-automation/issues/161). So the repair was
+  written, compiled and behaviour-proved, and is handed over as a patch rather
+  than smuggled into a shared dependency.
+
+  It belongs in the SAME commit as the pin move. Do not apply it, move the pin
+  later, and let a green build sit in between: that green build is the misleading
+  one. (Applying it before the pin move is harmless — see "at our pin" below —
+  but it proves nothing on its own.)
+
+WHY IT IS NEEDED
+
+  Upstream https://github.com/ing-bank/INGenious/pull/302 fixes a real bug — a
+  person who types the same test-case name into the recording-target dialog twice
+  used to overwrite their own first recording — by making createOrResolveTarget
+  never reuse a test case. It now always creates a uniquely suffixed one.
+
+  The method kept its name, its signature and its callers. Only its meaning
+  changed. The plugin path routes the plugin-chosen target through that exact
+  method, and its whole point is stable identity: a plugin says "this belongs to
+  test case X", and re-recording X has to land in X. After #302 the same call
+  produces X, X_1, X_2 — with a clean merge, a compiling build and no warning.
+
+  findExistingTarget already exists at upstream head, and #302 left it with zero
+  callers. The repair picks it back up. It leaves upstream's dialog fix entirely
+  intact: the dialog does not go through findExistingTarget and keeps uniquifying.
+
+HOW TO APPLY
+
+  cd INGenious
+  git apply ../ingenious-plugin/harness/repair/plugin-target-identity.patch
+
+  Written against our fork commit e2aa28a4 (feat/studio-panel-plugins), and
+  checked with `git apply --check`:
+
+    our pin e2aa28a4                                  applies
+    the three-way merge of e2aa28a4 with 7bc763b6     applies   <- the pin move
+    upstream head 7bc763b6 on its own                 DOES NOT
+
+  The last line is not a defect and is written down so nobody reads a failure
+  there as a stale patch: upstream has no plugin recording-target branch at all,
+  so there is nothing for these context lines to attach to. The file the pin move
+  actually produces is the middle one, and that is the one that matters.
+
+  Applied to that merged file, the `source` square of the guard flips from red to
+  green and names the reason: limb A false, limb B true — identity no longer
+  depends on upstream keeping createOrResolveTarget's old meaning.
+
+WHAT WAS PROVED, AND WHERE
+
+  * It compiles at our current pin. A temp tree from `git archive HEAD` of the
+    submodule (never the shared target/, which has produced a stale-binary false
+    verdict three times) was built twice with JDK 17:
+        mvn -pl IDE -am -DskipTests -Dprettier.skip=true compile
+    control (unpatched) exit 0, patched exit 0.
+  * The behaviour, both directions:
+        bash ingenious-plugin/harness/run-plugin-target-identity-harness.sh
+    Seven squares, one of which must be RED. `after-302` — upstream's resolution
+    step with today's plugin branch — fails, and prints the fork:
+        the plugin asked for : 3951650 - Partner-Suche + Kunde-360
+        and the second recording went to : 3951650 - Partner-Suche + Kunde-360_1
+    `after-302-repaired` — the same core with the two statements below — passes.
+  * At our pin the repair is behaviourally inert: createOrResolveTarget still
+    resolves, so findExistingTarget finds what it would have returned. The
+    `repaired` square proves that, and that nothing that used to be created has
+    stopped being created — new target, new scenario, reusable half kept separate
+    from the ordinary one of the same name.
+
+WHAT WAS NOT PROVED
+
+  Nothing was run in a live Studio. The recorder only reaches this code with
+  Playwright and a browser up; the doubles reproduce the resolution step, not the
+  recorder. After the pin moves, re-record a plugin-named target twice in a real
+  Studio and confirm one test case — that is item 1 of the re-proof list in
+  https://github.com/Wladefant/ing-qa-automation/blob/main/docs/reference/UPSTREAM-DRIFT-3.1.0-2026-07-28.md
+
+diff --git a/IDE/src/main/java/com/ing/ide/main/mainui/components/testdesign/testcase/TestCaseComponent.java b/IDE/src/main/java/com/ing/ide/main/mainui/components/testdesign/testcase/TestCaseComponent.java
+index 1e47530..3fdccec 100644
+--- a/IDE/src/main/java/com/ing/ide/main/mainui/components/testdesign/testcase/TestCaseComponent.java
++++ b/IDE/src/main/java/com/ing/ide/main/mainui/components/testdesign/testcase/TestCaseComponent.java
+@@ -690,12 +690,29 @@ public class TestCaseComponent extends JPanel implements ActionListener {
+ 
+         TestCase target;
+         if (pluginTarget != null) {
++            // A plugin naming a target MEANS it. The name is an identity — a test case id the
++            // rest of the tester loop is filed under — so re-recording it has to land in it,
++            // not beside it. Look for the target before making one.
++            //
++            // createOrResolveTarget cannot answer that, because it is shared with the dialog,
++            // where the opposite is true: a person who types the same name twice must not
++            // overwrite their own first recording. That is a real bug and it is fixed by
++            // uniquifying there. findExistingTarget is the other half of the pair, and it is
++            // the half this path needs — and the half upstream left with no callers.
+             target =
+-                createOrResolveTarget(
++                findExistingTarget(
+                     pluginTarget.getScenarioName(),
+                     pluginTarget.getTestCaseName(),
+                     pluginTarget.isReusableScenario()
+                 );
++            if (target == null) {
++                target =
++                    createOrResolveTarget(
++                        pluginTarget.getScenarioName(),
++                        pluginTarget.getTestCaseName(),
++                        pluginTarget.isReusableScenario()
++                    );
++            }
+         } else {
+             RecordingTargetDialog.Selection selection = RecordingTargetDialog.showDialog(
+                 this,

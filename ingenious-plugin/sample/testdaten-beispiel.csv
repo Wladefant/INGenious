@@ -1,0 +1,7 @@
+KONTONUMMER;Partnertyp;Produktvariante;Legitimiert;Boni;MDJ
+1000000001;P;Giro Direkt;ja;12;nein
+1000000002;G;Giro Direkt;ja;21;nein
+1000000003;P;Extra-Konto;nein;12;ja
+1000000004;J;Giro Direkt;ja;12;ja
+1000000005;P;Extra-Konto;ja;21;nein
+9999999999;P;Giro Direkt;ja;12;nein
