@@ -1,0 +1,35 @@
+{
+  "_fixture": "GET _apis/wit/workitems?ids=4711,4712&$expand=links&api-version=7.1 — the ALL-FIELDS batch (no fields= filter), which is what the panel cache needs. ERFUNDEN: organisation, project GUID, case ids, titles and text are invented; only the SHAPE is ADO's. Case 4711 carries a custom precondition field (Custom.Voraussetzungen) so precondition discovery by reference name is exercised; case 4712 has NO precondition-looking field and only Microsoft.VSTS.TCM.SystemInfo, exercising the fallback. Descriptions are HTML, exercising cleanRich() block-level line breaks. Case 4711 carries _links.html.href in the shape ADO hands out (a project GUID, not the project name — that is the observed RULE, the GUID itself is made up); 4712 deliberately carries NO _links, so the panel's construct-from-org/project fallback is exercised too.",
+  "count": 2,
+  "value": [
+    {
+      "id": 4711,
+      "_links": {
+        "self": { "href": "https://dev.azure.com/ExampleOrg/a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d/_apis/wit/workItems/4711" },
+        "html": { "href": "https://dev.azure.com/ExampleOrg/a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d/_workitems/edit/4711" }
+      },
+      "fields": {
+        "System.Id": 4711,
+        "System.Title": "Beispiel SYSTEMTEST: Kundensuche + Kundenuebersicht (Set1)",
+        "System.State": "Design",
+        "System.WorkItemType": "Test Case",
+        "System.Description": "<div><p>Pruefen, dass die Kundensuche einen Bestandskunden findet und die Kundenuebersicht sich oeffnet.</p><p>Gilt fuer Einzelkunden &amp; Gemeinschaftskonten.</p></div>",
+        "Custom.Voraussetzungen": "<div><p>Der Kunde muss:</p><ul><li>ein aktives Girokonto besitzen</li><li>fuer Online-Banking freigeschaltet sein</li><li>Bonitaet 12 haben</li></ul><p>Berater ist mit SSO angemeldet.</p></div>",
+        "Microsoft.VSTS.TCM.SystemInfo": "<p>Testumgebung: Beispielumgebung ABN</p>",
+        "Microsoft.VSTS.TCM.Steps": "<steps id=\"0\" last=\"3\"><step id=\"2\" type=\"ActionStep\"><parameterizedString isformatted=\"true\">&lt;P&gt;Kundensuche &amp; Kundenuebersicht oeffnen&lt;/P&gt;</parameterizedString><parameterizedString isformatted=\"true\">&lt;P&gt;Suchmaske erscheint&lt;/P&gt;</parameterizedString><description/></step><step id=\"3\" type=\"ValidateStep\"><parameterizedString isformatted=\"true\">&lt;P&gt;Betrag 100&#8364; erfassen&lt;/P&gt;</parameterizedString><parameterizedString isformatted=\"true\">&lt;P&gt;Ergebnistabelle zeigt Treffer&lt;/P&gt;</parameterizedString><description/></step></steps>"
+      }
+    },
+    {
+      "id": 4712,
+      "fields": {
+        "System.Id": 4712,
+        "System.Title": "Ueberweisung mit 4-Augen-Prinzip",
+        "System.State": "Ready",
+        "System.WorkItemType": "Test Case",
+        "System.Description": "<p>Eine Ueberweisung ueber dem Limit muss von einem zweiten Berater freigegeben werden.</p>",
+        "Microsoft.VSTS.TCM.SystemInfo": "<p>Der Kunde muss ueberweisungsberechtigt sein und ein Tageslimit unter 1.000 EUR haben.</p>",
+        "Microsoft.VSTS.TCM.Steps": "<steps id=\"0\" last=\"2\"><step id=\"2\" type=\"ActionStep\"><parameterizedString isformatted=\"true\">&lt;DIV&gt;&lt;P&gt;Ueberweisung erfassen&lt;/P&gt;&lt;/DIV&gt;</parameterizedString><parameterizedString isformatted=\"true\">&lt;P&gt;Freigabe erforderlich&lt;/P&gt;</parameterizedString><description/></step></steps>"
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+schemaVersion: 1
+testCase: PartnerOeffnen
+scenario: Kundensuche
+steps:
+  - step: 1
+    object: Browser
+    description: Seite oeffnen
+    action: Open
+    input: '@https://example.invalid/suche'
+
+  - step: 2
+    object: Suchfeld
+    description: Auf das Suchfeld warten
+    action: waitForElementToBeVisible
+
+  - step: 3
+    object: Suchfeld
+    description: Suchbegriff eintragen
+    action: Fill
+    input: '%Suchbegriff%'

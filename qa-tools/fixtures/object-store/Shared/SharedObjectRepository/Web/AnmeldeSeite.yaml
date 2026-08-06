@@ -1,0 +1,16 @@
+# The SHARED Object Repository: <appRoot>/Shared/SharedObjectRepository/Web.
+#
+# It lives OUTSIDE every project — ObjectRepository.getSharedORRepLocation() builds this path
+# from the running install's user.dir, not from the project — which is why a catalogue that
+# only walks <project>/ObjectRepository never sees a single object in it, and then reports
+# every step that uses one as referring to nothing.
+page: AnmeldeSeite
+scope: SHARED
+elements:
+  # Named directly by a step in "Fall C", with Reference "[Shared] AnmeldeSeite".
+  BenutzerFeld:
+    css: "input[name=\"anmeldung:benutzer\"]"
+  # Named ONLY inside the shared Baustein Gemeinsam:Anmelden. No test case file mentions it,
+  # and "Fall C" breaks when it changes. That is the whole point of following the calls.
+  PasswortFeld:
+    css: "input[name=\"anmeldung:passwort\"]"

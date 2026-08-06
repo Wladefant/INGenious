@@ -1,0 +1,14 @@
+schemaVersion: 1
+testCase: Anmelden
+scenario: Gemeinsam
+steps:
+  - step: 1
+    object: Browser
+    description: Anmeldeseite oeffnen
+    action: Open
+    input: '@https://example.invalid/login'
+
+  - step: 2
+    object: AnmeldenButton
+    description: Anmelden anklicken
+    action: Click

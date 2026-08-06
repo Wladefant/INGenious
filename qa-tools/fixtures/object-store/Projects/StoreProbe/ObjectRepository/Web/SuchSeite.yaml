@@ -1,0 +1,25 @@
+page: SuchSeite
+scope: PROJECT
+elements:
+  # Used by BOTH test cases -> wide blast radius.
+  SearchInput:
+    css: "input[name=\"suchForm:feld\"]"
+  # The SAME selector as SearchInput, differing only in quote style, under a second name.
+  # This is the duplicate the store must collapse into one finding.
+  Suchfeld:
+    css: "input[name='suchForm:feld']"
+  SuchenButton:
+    xpath: "//button[contains(text(),'Suchen')]"
+  # Framework-generated id: changes per render.
+  GeneriertesFeld:
+    css: "#id42"
+  # Positional: breaks as soon as a row is inserted.
+  ErsteZeile:
+    css: "table.ergebnis tr:nth-child(1)"
+  # xpath wins in the engine's precedence, so the css below is never looked at.
+  Ergebnis:
+    xpath: "//table[@id='ergebnis']"
+    css: "#id77"
+  # Defined but referenced by no step at all.
+  NieBenutzt:
+    css: ".gibt-es-nicht"

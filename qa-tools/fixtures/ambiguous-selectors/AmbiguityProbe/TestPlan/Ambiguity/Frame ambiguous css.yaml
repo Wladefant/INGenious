@@ -1,0 +1,22 @@
+schemaVersion: 1
+testCase: Frame ambiguous css
+scenario: Ambiguity
+steps:
+  - step: 1
+    object: Browser
+    description: Open the ambiguity fixture
+    action: Open
+    input: '@http://127.0.0.1:8731/'
+
+  - step: 2
+    object: FramePrimaryButton
+    description: Click .btn-primary inside the frame (three exist)
+    action: Click
+    reference: "[Project] AmbiguityPage"
+
+  - step: 3
+    object: FrameErgebnis
+    description: Assert the engine silently took the FIRST of the three matches
+    action: assertElementContainsText
+    input: 'geklickt: btn-aktualisieren-frame'
+    reference: "[Project] AmbiguityPage"

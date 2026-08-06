@@ -1,0 +1,2 @@
+Step,ObjectName,Description,Action,Input,Condition,Reference
+1,Execute,Aktion ohne Geltungsbereich - der steht in der Reference-Spalte,Gemeinsam:Anmelden,,,[Shared]

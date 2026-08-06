@@ -1,0 +1,18 @@
+{
+  "_fixture": "GET _apis/testplan/Plans/1000000/Suites/2000/TestPoint?api-version=7.1. ERFUNDEN: every id here is invented. Two points: a NEW case 4712, plus a DUPLICATE of 4711 (also a member of suite 1000) so the selftest can prove de-duplication across suites.",
+  "count": 2,
+  "value": [
+    {
+      "id": 77002,
+      "testCaseReference": { "id": 4712, "name": "Ueberweisung mit 4-Augen-Prinzip" },
+      "results": { "outcome": "NotExecuted", "lastResultState": "NotReady" },
+      "isActive": true
+    },
+    {
+      "id": 77003,
+      "testCaseReference": { "id": 4711, "name": "Kundensuche + Kundenuebersicht (Set1)" },
+      "results": { "outcome": "Passed", "lastResultState": "Completed" },
+      "isActive": true
+    }
+  ]
+}

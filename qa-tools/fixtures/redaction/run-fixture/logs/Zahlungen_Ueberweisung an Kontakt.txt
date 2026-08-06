@@ -1,0 +1,51 @@
+Run Information
+========================
+INGenious Playwright Studio                :  3.1.0
+java.runtime.name                          :  OpenJDK Runtime Environment
+os.name                                    :  Windows 11
+========================
+Run Started on Mon Jul 27 09:12:03 CEST 2026
+
+Scenario         :  [Zahlungen]
+TestCase         :  [Ueberweisung an Kontakt]
+Browser          :  [Chromium]
+----------------------------------------------------------
+Initializing Report
+Running Iteration :  [Single]
+
+
+===================================================================================================
+
+Step:1  |  Object:Browser  |  Action:Open  |  Input:Login:URL  |  Condition:  | @27-Juli-2026 09:12:04.001
+[DONE]   | Opened Url: https://beispiel-anwendung.intern/anmelden
+
+
+===================================================================================================
+
+Step:3  |  Object:Kennwort  |  Action:Fill  |  Input:%pwd%  |  Condition:  | @27-Juli-2026 09:12:05.101
+[DONE]   | Entered Text 'Sommer2026!' on '[Kennwort]'
+
+
+===================================================================================================
+
+Step:4  |  Object:PhotoTAN  |  Action:Fill  |  Input:%tan%  |  Condition:  | @27-Juli-2026 09:12:06.220
+[DONE]   | Entered Text '884213' on '[PhotoTAN]'
+
+
+===================================================================================================
+
+Step:7  |  Object:Empfaenger-IBAN  |  Action:Fill  |  Input:  |  Condition:  | @27-Juli-2026 09:12:09.440
+[DONE]   | Entered Text 'DE89 3704 0044 0532 0130 00' on '[Empfaenger-IBAN]'
+
+
+===================================================================================================
+
+Step:9  |  Object:Betrag  |  Action:Fill  |  Input:  |  Condition:  | @27-Juli-2026 09:12:10.010
+[DONE]   | Entered Text '12,50' on '[Betrag]'
+[INFO]   | Kontostand nach Buchung: 1.234,56 EUR
+
+
+===================================================================================================
+
+Total number of Steps Passed : 9
+Total number of Steps Failed : 0

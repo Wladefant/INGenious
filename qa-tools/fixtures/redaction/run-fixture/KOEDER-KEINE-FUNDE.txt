@@ -1,0 +1,17 @@
+Koeder-Datei: fachliche Testwerte, die KEIN Fund sein duerfen.
+Wenn redact-artifacts.mjs hier etwas meldet, ist es ein Fehlalarm.
+
+Kontostand nach Buchung: 1.234,56 EUR
+Verfuegungsrahmen: 5000
+Transaktions-ID 4711002233
+IBAN-Testwert mit falscher Pruefsumme: DE00 1234 5678 9012 3456 78
+Konstante: TESTWERT
+Bestand: 12
+Input:%pwd%
+Passwort-Feld sichtbar: ja
+Kennwort-Eingabefeld gefunden: true
+os.name : Windows 11
+java.runtime.name : OpenJDK Runtime Environment
+scenarioName: Zahlungen
+Build-Tag: release@2026
+Schritt 4 dauerte 884213 Millisekunden

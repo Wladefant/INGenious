@@ -1,0 +1,13 @@
+{
+  "_fixture": "Second (final) page of the suites listing of the invented plan 1000000. The selftest transport returns this when the suites URL carries continuationToken=CT-SUITES-2, and supplies NO continuation header so the pager stops. Proves x-ms-continuationtoken pagination. It is a CHILD of suite 1000 — parentSuite is the field the tool used to read and throw away, and the tree is nothing but that field kept.",
+  "count": 1,
+  "value": [
+    {
+      "id": 2000,
+      "name": "Kundenuebersicht Suite",
+      "suiteType": "StaticTestSuite",
+      "revision": 3,
+      "parentSuite": { "id": 1000, "name": "Kundensuche Suite" }
+    }
+  ]
+}

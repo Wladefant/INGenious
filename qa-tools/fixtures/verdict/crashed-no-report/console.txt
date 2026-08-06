@@ -1,0 +1,5 @@
+# Fixture: a run directory left behind by an engine that died before writing a report.
+# Shape copied from a real INGenious console dump; the report files are absent on purpose.
+# Expected: ingenious-verdict.mjs --run-dir <this> -> exit 2, cause EMPTY_REPORT.
+Exception in thread "main" java.lang.NullPointerException
+	at com.ing.engine.core.Control.startExecution(Control.java:118)

@@ -1,0 +1,12 @@
+{
+  "_fixture": "GET _apis/testplan/Plans/1000000/Suites/1000/TestPoint?api-version=7.1. ERFUNDEN: plan id, suite id, point id and case id are invented — the SHAPE is ADO's, the values name no real plan. One point → test case 4711.",
+  "count": 1,
+  "value": [
+    {
+      "id": 77001,
+      "testCaseReference": { "id": 4711, "name": "Kundensuche + Kundenuebersicht (Set1)" },
+      "results": { "outcome": "Passed", "lastResultState": "Completed" },
+      "isActive": true
+    }
+  ]
+}

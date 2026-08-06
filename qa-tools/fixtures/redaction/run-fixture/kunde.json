@@ -1,0 +1,19 @@
+{
+  "testfall": "Ueberweisung an Kontakt",
+  "kunde": {
+    "kundennummer": "4711002233",
+    "kontonummer": "0532013000",
+    "iban": "DE89 3704 0044 0532 0130 00",
+    "vorname": "Maximilian",
+    "nachname": "Mustermann",
+    "email": "max.mustermann@example.de",
+    "telefon": "+49 211 5555123",
+    "geburtsdatum": "14.03.1978",
+    "passwort": "Sommer2026!"
+  },
+  "produkt": {
+    "verfuegungsrahmen": "5000",
+    "kontostand": "1234.56",
+    "partnertyp": "P"
+  }
+}

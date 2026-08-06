@@ -1,0 +1,24 @@
+page: AmbiguityPage
+scope: PROJECT
+elements:
+  Ergebnis:
+    css: "#out"
+  KontoAnlegen:
+    role: "BUTTON;Konto anlegen"
+  WeiterButton:
+    role: "BUTTON;Weiter"
+  PrimaryButton:
+    css: ".btn-primary"
+  KontonummerFeld:
+    placeholder: "Kontonummer"
+  FrameErgebnis:
+    frame: "#altsystem"
+    css: "#frame-out"
+  FramePrimaryButton:
+    frame: "#altsystem"
+    css: ".btn-primary"
+  FrameSpeichern:
+    frame: "#altsystem"
+    role: "BUTTON;Speichern"
+  ChainedBeispiel:
+    chainedLocator: 'locator(".panel");getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Weiter"))'

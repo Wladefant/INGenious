@@ -1,0 +1,6 @@
+Step,ObjectName,Description,Action,Input,Condition,Reference
+1,Browser,Seite oeffnen,Open,@https://example.invalid/suche,,
+2,SearchInput,Auf das Suchfeld warten,waitForElementToBeVisible,,,[Project] SuchSeite
+3,SearchInput,Suchbegriff eintragen,Fill,4711,,[Project] SuchSeite
+4,SuchenButton,Suche abschicken,Click,,,[Project] SuchSeite
+5,Ergebnis,Ergebnis pruefen,assertElementIsVisible,,,[Project] SuchSeite

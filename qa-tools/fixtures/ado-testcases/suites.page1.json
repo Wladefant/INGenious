@@ -1,0 +1,18 @@
+{
+  "_fixture": "First page of GET _apis/testplan/Plans/1000000/suites?api-version=7.1. ERFUNDEN: plan id, suite ids and names are invented. The selftest transport returns this when the suites URL carries NO continuationToken param, and supplies x-ms-continuationtoken=CT-SUITES-2 so the pager fetches suites.page2.json next. This is the ROOT suite: no parentSuite, so the tree hangs off it. It also carries a lastUpdatedBy identity on purpose — the cache must not contain it, and a fixture that proves the strip is worth more than a comment describing it.",
+  "count": 1,
+  "value": [
+    {
+      "id": 1000,
+      "name": "Kundensuche Suite",
+      "suiteType": "StaticTestSuite",
+      "revision": 7,
+      "lastUpdatedDate": "2026-07-01T08:12:44.000Z",
+      "lastUpdatedBy": {
+        "displayName": "Eine echte Person",
+        "uniqueName": "eine.person@example.invalid",
+        "id": "00000000-1111-2222-3333-444444444444"
+      }
+    }
+  ]
+}

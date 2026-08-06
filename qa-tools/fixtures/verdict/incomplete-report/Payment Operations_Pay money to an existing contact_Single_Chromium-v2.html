@@ -1,0 +1,7 @@
+<!doctype html>
+<!-- Fixture: a per-testcase report the engine started but never finished writing.
+     parse-report.mjs finds the file, cannot extract `var DATA = {...};</script>`, and
+     reports the case with status "unknown".
+     Expected: ingenious-verdict.mjs --run-dir <this> -> exit 2, cause INCOMPLETE_REPORT. -->
+<html><head><title>INGenious Report</title></head><body>
+<script>var DATA = {"scenarioName":"Payment Operations","testcaseName":"Pay money to an exi

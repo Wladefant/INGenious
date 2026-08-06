@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Ambiguity probe — Kundenverwaltung</title>
+<style>
+  body { font-family: sans-serif; margin: 2rem; max-width: 60rem; }
+  .panel { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; }
+  .btn-primary { padding: .4rem 1rem; margin-right: .5rem; }
+  #out { font-weight: bold; color: #063; }
+  iframe { width: 100%; height: 140px; border: 1px solid #999; }
+</style>
+</head>
+<body>
+
+<h1>Kundenverwaltung</h1>
+
+<!--
+  Fixture for the selector-uniqueness probe. The page is invented; every ambiguity below
+  is DELIBERATE and mirrors a shape that real enterprise web applications routinely have:
+  same-named controls repeated per panel, and an "Aktualisieren" that exists in the parent
+  document AND inside a legacy iframe.
+
+  UNIQUE (control group):  #btn-anlegen  /  role=button name="Konto anlegen"
+  AMBIGUOUS by role+name:  two buttons named "Weiter"       -> 2 matches
+  AMBIGUOUS by css class:  .btn-primary                     -> 4 matches
+  AMBIGUOUS by text:       "Aktualisieren" parent + iframe  -> 2 matches (cross-frame)
+  AMBIGUOUS by placeholder: two inputs "Kontonummer"        -> 2 matches
+-->
+
+<div class="panel">
+  <h2>Persönliche Daten</h2>
+  <label>Kontonummer <input type="text" placeholder="Kontonummer" id="konto-1"></label>
+  <button class="btn-primary" id="weiter-persoenlich">Weiter</button>
+</div>
+
+<div class="panel">
+  <h2>Abweichende Bankverbindung</h2>
+  <label>Kontonummer <input type="text" placeholder="Kontonummer" id="konto-2"></label>
+  <button class="btn-primary" id="weiter-bank">Weiter</button>
+</div>
+
+<div class="panel">
+  <h2>Aktionen</h2>
+  <button class="btn-primary" id="btn-anlegen">Konto anlegen</button>
+  <button class="btn-primary" id="btn-aktualisieren-parent">Aktualisieren</button>
+</div>
+
+<div class="panel">
+  <h2>Altsystem</h2>
+  <iframe id="altsystem" title="Altsystem" src="frame.html"></iframe>
+</div>
+
+<p id="out">bereit</p>
+
+<script>
+  // Each control writes WHICH one was actually hit. A test that clicks the wrong
+  // "Weiter" still "passes" the click; this makes the wrong target visible.
+  for (const b of document.querySelectorAll('button')) {
+    b.addEventListener('click', () => {
+      document.getElementById('out').textContent = 'geklickt: ' + b.id;
+    });
+  }
+</script>
+
+</body>
+</html>

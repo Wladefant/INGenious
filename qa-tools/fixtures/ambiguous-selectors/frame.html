@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Altsystem</title>
+<style>
+  body { font-family: sans-serif; margin: .5rem; }
+  .btn-primary { padding: .4rem 1rem; }
+</style>
+</head>
+<body>
+<!--
+  The legacy-frame half of the fixture. "Aktualisieren" exists here AND in the parent
+  document, so a top-level getByText("Aktualisieren") is ambiguous across the frame
+  boundary - the shape a legacy system embedded in a modern shell typically produces.
+-->
+<p>Alt-System</p>
+<!--
+  Two .btn-primary INSIDE the frame, and two buttons named "Speichern" inside the frame.
+  These exist to probe the frame path of AutomationObject.getElements(FrameLocator,...),
+  where the css branch is `.first()` and the role branch is not.
+-->
+<button class="btn-primary" id="btn-aktualisieren-frame">Aktualisieren</button>
+<button class="btn-primary" id="btn-speichern-a">Speichern</button>
+<button class="btn-primary" id="btn-speichern-b">Speichern</button>
+<p id="frame-out">frame bereit</p>
+<script>
+  for (const b of document.querySelectorAll('button')) {
+    b.addEventListener('click', () => {
+      document.getElementById('frame-out').textContent = 'geklickt: ' + b.id;
+    });
+  }
+</script>
+</body>
+</html>

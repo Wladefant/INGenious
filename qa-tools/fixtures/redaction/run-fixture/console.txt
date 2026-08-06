@@ -1,0 +1,11 @@
+Run Information
+========================
+INGenious Playwright Studio engine : 3.1.0
+java.version         : 21.0.10
+========================
+
+[DONE]   | Opened Url: https://testuser:GeheimesKennwort@beispiel-anwendung.intern/anmelden
+DEBUG    | Header authorization: Basic dGVzdHVzZXI6R2VoZWltZXNLZW5ud29ydA==
+DEBUG    | Antwort-Token: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N
+INFO     | Rueckmeldung an nutzer.hinweis@ing-testlabor.example.de versendet
+INFO     | Testlauf beendet

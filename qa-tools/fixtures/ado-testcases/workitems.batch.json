@@ -1,0 +1,20 @@
+{
+  "_fixture": "GET _apis/wit/workitems?ids=4711,4712&fields=System.Title,Microsoft.VSTS.TCM.Steps&api-version=7.1. ERFUNDEN: case ids, titles and step text are invented. Steps are ADO's HTML-encoded XML: each <step> holds two <parameterizedString> children (action, expected). The action of the first step of 4711 exercises &amp; entity decode + tag stripping; the second step exercises a numeric &#8364; entity.",
+  "count": 2,
+  "value": [
+    {
+      "id": 4711,
+      "fields": {
+        "System.Title": "Beispiel SYSTEMTEST: Kundensuche + Kundenuebersicht (Set1)",
+        "Microsoft.VSTS.TCM.Steps": "<steps id=\"0\" last=\"3\"><step id=\"2\" type=\"ActionStep\"><parameterizedString isformatted=\"true\">&lt;P&gt;Kundensuche &amp; Kundenuebersicht oeffnen&lt;/P&gt;</parameterizedString><parameterizedString isformatted=\"true\">&lt;P&gt;Suchmaske erscheint&lt;/P&gt;</parameterizedString><description/></step><step id=\"3\" type=\"ValidateStep\"><parameterizedString isformatted=\"true\">&lt;P&gt;Betrag 100&#8364; erfassen&lt;/P&gt;</parameterizedString><parameterizedString isformatted=\"true\">&lt;P&gt;Ergebnistabelle zeigt Treffer&lt;/P&gt;</parameterizedString><description/></step></steps>"
+      }
+    },
+    {
+      "id": 4712,
+      "fields": {
+        "System.Title": "Ueberweisung mit 4-Augen-Prinzip",
+        "Microsoft.VSTS.TCM.Steps": "<steps id=\"0\" last=\"2\"><step id=\"2\" type=\"ActionStep\"><parameterizedString isformatted=\"true\">&lt;DIV&gt;&lt;P&gt;Ueberweisung erfassen&lt;/P&gt;&lt;/DIV&gt;</parameterizedString><parameterizedString isformatted=\"true\">&lt;P&gt;Freigabe erforderlich&lt;/P&gt;</parameterizedString><description/></step></steps>"
+      }
+    }
+  ]
+}
