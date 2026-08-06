@@ -1,4 +1,4 @@
-# qa-tools
+# tools
 
 Node- und PowerShell-Werkzeuge rund um INGenious: Aufnahmen prüfen, Objekte und
 Selektoren katalogisieren, Läufe auswerten, Ergebnisse und Nachweise nach Azure
@@ -49,9 +49,5 @@ Erstveröffentlichung. Die Werkzeuge laufen produktiv, die hier abgelegte Fassun
 ist von organisationsspezifischen Bezeichnern befreit worden. Zwei Dinge sind
 noch offen und stehen hier, statt entdeckt zu werden:
 
-- **Pfadkonstanten.** Aufrufer erwarten die Werkzeuge unter `tools/`
-  (`RepoCheck.REQUIRED`, die `TOOL_REL`-Konstanten der Studio-Panels, die
-  Repo-Wurzelsuche in `ado-upload.mjs`). Wer sie aus `qa-tools/` heraus startet,
-  muss diese Konstanten umbiegen.
 - **Dokumentation.** Die ausführlichen `README-<werkzeug>.md` sind noch nicht
   mitveröffentlicht.
