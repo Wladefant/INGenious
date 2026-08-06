@@ -10,8 +10,11 @@ import com.ing.util.encryption.Encryption;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.Browser.NewContextOptions;
 import com.microsoft.playwright.BrowserType.LaunchOptions;
+import com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.net.URLEncoder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -19,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -114,6 +118,7 @@ public class PlaywrightDriverFactory {
     )
         throws UnsupportedEncodingException {
         List<String> capabilities = getCapability(browserName, settings);
+        String userDataDir = takeUserDataDir(capabilities);
         NewContextOptions newContextOptions = new NewContextOptions();
         newContextOptions = addContextOptions(newContextOptions, context, capabilities, settings);
         LaunchOptions launchOptions = new LaunchOptions();
@@ -125,6 +130,13 @@ public class PlaywrightDriverFactory {
             cdpURL =
                 cdpURL + "playwright?capabilities=" + lambdaTestCapabilities(context, capabilities);
             browserContext = browserType.connect(cdpURL).newContext(newContextOptions);
+        } else if (!userDataDir.isEmpty()) {
+            System.out.println("Using the browser profile in '" + userDataDir + "'\n");
+            browserContext =
+                browserType.launchPersistentContext(
+                    Paths.get(userDataDir),
+                    toPersistentContextOptions(launchOptions, newContextOptions)
+                );
         } else {
             browserContext = browserType.launch(launchOptions).newContext(newContextOptions);
         }
@@ -132,11 +144,92 @@ public class PlaywrightDriverFactory {
     }
 
     public static Page createPage(BrowserContext browserContext) {
+        // A context launched against a profile on disk opens with a page already; a context
+        // created on a running browser opens with none. Reusing what is there keeps a run from
+        // leaving an empty window behind.
+        List<Page> openPages = browserContext.pages();
+        if (!openPages.isEmpty()) {
+            return openPages.get(0);
+        }
         Page page = browserContext.newPage();
         return page;
     }
 
     private static final Logger LOGGER = Logger.getLogger(PlaywrightDriverFactory.class.getName());
+
+    /**
+     * Removes the profile directory from the capabilities and returns it.
+     *
+     * <p>It is taken out rather than read in place because it is not an option a browser is
+     * launched with: it decides <em>how</em> the browser is launched, and leaving it in the list
+     * would send it on to the browser as an unrecognised command-line argument.
+     *
+     * @param caps the capabilities configured for this browser, modified in place
+     * @return the configured directory, or an empty string when there is none
+     */
+    private static String takeUserDataDir(List<String> caps) {
+        String userDataDir = "";
+        Iterator<String> remaining = caps.iterator();
+        while (remaining.hasNext()) {
+            String cap = remaining.next();
+            String key = cap.split("=", 2)[0];
+            if (key.toLowerCase().contains("setuserdatadir")) {
+                userDataDir = cap.split("=", 2)[1].trim();
+                remaining.remove();
+            }
+        }
+        return userDataDir;
+    }
+
+    /**
+     * Restates launch and context options as the single options object a persistent context is
+     * launched with.
+     *
+     * <p>Playwright keeps the three option classes separate but names the same option the same
+     * way in all of them, so the values are carried across by name. Doing it by name rather than
+     * one assignment per option means an option this factory learns to set later arrives here on
+     * its own, instead of being quietly dropped for anyone using a profile. An option a
+     * persistent context does not accept — the stored session state, which a profile on disk
+     * already carries — simply has no counterpart and is skipped.
+     *
+     * @param launchOptions the options the browser would have been launched with
+     * @param contextOptions the options the context would have been created with
+     * @return the combined options
+     */
+    private static LaunchPersistentContextOptions toPersistentContextOptions(
+        LaunchOptions launchOptions,
+        NewContextOptions contextOptions
+    ) {
+        LaunchPersistentContextOptions persistentOptions = new LaunchPersistentContextOptions();
+        copyOptionsByName(launchOptions, persistentOptions);
+        copyOptionsByName(contextOptions, persistentOptions);
+        return persistentOptions;
+    }
+
+    private static void copyOptionsByName(Object source, LaunchPersistentContextOptions target) {
+        for (Field sourceField : source.getClass().getFields()) {
+            if (Modifier.isStatic(sourceField.getModifiers())) {
+                continue;
+            }
+            try {
+                Object value = sourceField.get(source);
+                if (value == null) {
+                    continue;
+                }
+                Field targetField = target.getClass().getField(sourceField.getName());
+                if (targetField.getType().equals(sourceField.getType())) {
+                    targetField.set(target, value);
+                }
+            } catch (NoSuchFieldException | IllegalAccessException ex) {
+                LOGGER.fine(
+                    "Option '" +
+                    sourceField.getName() +
+                    "' does not apply to a persistent context: " +
+                    ex.getMessage()
+                );
+            }
+        }
+    }
 
     private static LaunchOptions addLaunchOptions(LaunchOptions launchOptions, List<String> caps) {
         List<String> customArgs = new ArrayList<>();
