@@ -1,9 +1,11 @@
-Nachweis fuer #207
+Nachweis fuer #207 - zweiter Durchgang
 
-Diese Datei existiert nur, um zu zeigen, dass die Schaltflaeche
-"ING aktualisieren" in einer Tester-Installation wirklich neue
-Commits aus diesem Fork holt.
+Diese Zeile ist NACH der Installation des Pakets
+ing-tester-paket-20260807-cad68c03.zip entstanden.
 
-Gepusht am 07.08.2026, nachdem das Paket ing-tester-paket-20260807-805b702c.zip
-bereits installiert war. Wenn diese Datei nach dem Knopfdruck in
-repo	ools\ liegt, ist der Beweis gefuehrt.
+Die Installation stand beim Auspacken auf cad68c03.
+Liegt dieser Text nach einem Klick auf "ING aktualisieren"
+in repo	ools\, dann hat die Installation den Commit
+wirklich vom Server geholt - ohne git und ohne node im PATH.
+
+Gepusht: 07.08.2026
