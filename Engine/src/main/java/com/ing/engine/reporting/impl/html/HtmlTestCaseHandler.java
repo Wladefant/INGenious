@@ -519,6 +519,11 @@ public class HtmlTestCaseHandler extends TestCaseHandler implements PrimaryHandl
     ) {
         switch (state) {
             case DONE:
+                // A step that acted and did not throw. It is counted first, because
+                // canTakeScreenShot() must not count it a second time.
+                onSetpDone();
+                takeScreenShot(state, optional, optionalLink, data);
+                break;
             case PASSNS:
                 onSetpDone();
                 break;
@@ -546,6 +551,7 @@ public class HtmlTestCaseHandler extends TestCaseHandler implements PrimaryHandl
     ) {
         String imgSrc = getScreenShotName();
         switch (status) {
+            case DONE:
             case PASS:
             case FAIL:
                 if (!canTakeScreenShot(status)) {
@@ -565,13 +571,45 @@ public class HtmlTestCaseHandler extends TestCaseHandler implements PrimaryHandl
     private Boolean canTakeScreenShot(Status status) {
         if (status.equals(Status.FAIL)) {
             onSetpFailed();
-            return screenShotSettings().matches("(Fail|Both)");
-        }
-        if (status.equals(Status.PASS)) {
+        } else if (status.equals(Status.PASS)) {
             onSetpPassed();
-            return screenShotSettings().matches("(Pass|Both)");
         }
-        return false;
+        return wantsScreenShot(status, screenShotSettings());
+    }
+
+    /**
+     * Whether a step in this state earns a picture under the given {@code ScreenShotFor}.
+     *
+     * <p>
+     * {@code DONE} is the state every acting step reports — Open, Fill, Click, waitFor. Only
+     * assertions report {@code PASS}. While {@code DONE} was excluded here, a run of a recorded
+     * flow — which is nothing but actions — produced no step image at all, however loudly
+     * {@code ScreenShotFor=Both} said otherwise, and the evidence document built from those images
+     * came out empty. A step that worked is a step the setting promises a picture of, whether the
+     * engine calls that state DONE or PASS.
+     * </p>
+     *
+     * <p>
+     * {@code PASSNS} keeps its meaning and is deliberately absent: it is the state for a step that
+     * passed and must stay unphotographed.
+     * </p>
+     *
+     * @param status the state the step reported
+     * @param screenShotFor the {@code ScreenShotFor} run setting — {@code Pass}, {@code Fail},
+     *        {@code Both}, or anything else for none
+     * @return whether a screenshot is taken for this step
+     */
+    static boolean wantsScreenShot(Status status, String screenShotFor) {
+        String setting = screenShotFor == null ? "" : screenShotFor;
+        switch (status) {
+            case FAIL:
+                return setting.matches("(Fail|Both)");
+            case DONE:
+            case PASS:
+                return setting.matches("(Pass|Both)");
+            default:
+                return false;
+        }
     }
 
     private static String screenShotSettings() {
