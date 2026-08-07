@@ -16,7 +16,13 @@ public class RecorderCodegenArgsTest {
     private static final String STORAGE = " --load-storage \"/tmp/state/default.json\"";
 
     private String output() {
-        return "codegen --target java --output \"" + OUTPUT.getAbsolutePath() + "\"";
+        // Escaped like the command itself escapes it: on Windows an absolute path is full of
+        // backslashes, and an expected string that skipped the escaping would never match.
+        return (
+            "codegen --target java --output \"" +
+            OUTPUT.getAbsolutePath().replace("\\", "\\\\") +
+            "\""
+        );
     }
 
     @Test
