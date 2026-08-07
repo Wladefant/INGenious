@@ -144,10 +144,14 @@ public class PlaywrightDriverCreation implements PlaywrightDriverCreationApi {
 
     public void StopBrowser() {
         try {
+            // Null for a context launched against a profile on disk: there is no separate
+            // browser object to close, closing the context ends the browser.
             com.microsoft.playwright.Browser browser = browserContext.browser();
             page.close();
             closeBrowserContext();
-            browser.close();
+            if (browser != null) {
+                browser.close();
+            }
         } catch (Exception ex) {
             Logger.getLogger(this.getClass().getName()).log(Level.OFF, null, ex);
         }
@@ -208,7 +212,10 @@ public class PlaywrightDriverCreation implements PlaywrightDriverCreationApi {
     }
 
     public String getBrowserVersion() {
-        return browserContext.browser().version();
+        com.microsoft.playwright.Browser browser = browserContext.browser();
+        // A context launched against a profile on disk has no browser object to ask; the
+        // reports that show this version treat an empty value as "not reported".
+        return browser == null ? "" : browser.version();
     }
 
     public RunContext getRunContext() {
