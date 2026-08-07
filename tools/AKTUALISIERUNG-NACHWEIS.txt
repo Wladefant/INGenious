@@ -1,0 +1,9 @@
+Nachweis fuer #207
+
+Diese Datei existiert nur, um zu zeigen, dass die Schaltflaeche
+"ING aktualisieren" in einer Tester-Installation wirklich neue
+Commits aus diesem Fork holt.
+
+Gepusht am 07.08.2026, nachdem das Paket ing-tester-paket-20260807-805b702c.zip
+bereits installiert war. Wenn diese Datei nach dem Knopfdruck in
+repo	ools\ liegt, ist der Beweis gefuehrt.
