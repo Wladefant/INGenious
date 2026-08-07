@@ -29,9 +29,11 @@
     * an ENGINEER's checkout - a real git working tree, with git and Maven on it. All three
       parts above can genuinely be brought forward. That is what this script was written for.
     * a TESTER's package installation - <Ziel>\repo beside <Ziel>\studio and <Ziel>\node,
-      unpacked from ing-tester-paket.zip. Today repo\ is a plain copy, because
-      tools\build-tester-package.ps1 copies files deliberately and the device has no git to
-      use a clone with.
+      unpacked from ing-tester-paket.zip. Since 05.08.2026 repo\ is a REAL clone of the public
+      fork - shallow, sparse on tools\, .git around 550 KB - and <Ziel>\git carries a MinGit to
+      work it with. The TOOLS can therefore be brought forward on a tester device too. The
+      Studio and the plugin still cannot: those need Maven and a build, and still arrive as a
+      new package.
 
   WHICH OF THE TWO IS DECIDED BY THE PACKAGE SHAPE, AND THE PACKAGE SHAPE WINS. Not by the
   presence of a .git: the day repo\ ships as a real clone, a tester installation satisfies both
@@ -48,10 +50,14 @@
 
   So the layout is DETERMINED, not assumed, and each gets what it can actually have:
     * checkout      -> pull, submodules, Studio build, plugin build. Unchanged.
-    * package       -> no git is touched at all. Everything that can be repaired locally is
-                       repaired (Node is fetched and checksum-verified if it is missing), the
-                       rest is measured and reported, and the run ends with the ONE sentence
-                       that says what a human has to do: install a newer package.
+    * package       -> the TOOLS are pulled --ff-only from the fork, with the MinGit the package
+                       brings. A dirty tree is named and refused, never stashed; an unreachable
+                       remote is one sentence and exit code 0, because an installation that
+                       could not phone home is not a broken installation. Everything else that
+                       can be repaired locally is repaired (Node is fetched and checksum-verified
+                       if it is missing), the rest is measured and reported, and the run ends
+                       with the ONE sentence that says what a human has to do for a newer Studio
+                       or plugin: install a newer package.
   A git call that fails can no longer end the run in a stack trace either; every one of them
   goes through Git-Text, which returns an empty string and lets the sentence above it be the
   thing the tester reads.
@@ -171,6 +177,89 @@ function Finde-Git {
   return $null
 }
 
+# WAS LIEGT DRUEBEN, UND WIRD ES GEHOLT. Der ganze Netzteil des Paketzweigs, an einer Stelle,
+# damit -Check und der echte Lauf UNMOEGLICH auseinanderlaufen koennen: beide stellen dieselbe
+# Frage an denselben Server, und nur die Antwort auf "und jetzt?" ist verschieden.
+# Der Aufrufer hat vorher sichergestellt, dass das Arbeitsverzeichnis sauber ist.
+function Melde-Fernstand([string]$repoPfad, [string]$zweig, [string]$upstream, [string]$before, [bool]$nurPruefen) {
+  # ERREICHBARKEIT ZUERST, UND ZWAR MIT ls-remote. Der Grund ist die wichtigste Anforderung an
+  # diesen Zweig ueberhaupt: eine Testerin ist regelmaessig offline oder haengt hinter einem
+  # Proxy, und ein fehlgeschlagener Abruf darf eine funktionierende Installation NIEMALS als
+  # kaputt melden. ls-remote schreibt keine Referenz und packt nichts aus - es fragt nur,
+  # welcher Stand drueben liegt. Ein leeres Ergebnis heisst "nicht erreichbar", und zwar ohne
+  # dass ein Fehlertext von git ins Fenster laeuft: Git-Text haelt dessen stderr zurueck, damit
+  # der eine Satz darunter die Zeile ist, die gelesen wird.
+  # Das kostet einen Abruf mehr als "einfach pullen und den Fehler deuten" - und erspart, den
+  # Unterschied zwischen "kein Netz" und "wirklich kaputt" aus englischen Fehlermeldungen raten
+  # zu muessen. Geraten wird hier nichts.
+  $fern  = ''
+  $zeile = Git-Text '-C' $repoPfad 'ls-remote' '--heads' 'origin' $zweig
+  if ($zeile -match '([0-9a-f]{40})') { $fern = $Matches[1] }
+
+  if (-not $fern) {
+    Info 'Gegenstelle nicht erreichbar - Installation unveraendert benutzbar.'
+    Info ('Es wurde nichts geholt; die Werkzeuge stehen weiter auf ' + (Kurz $before) + '.')
+    return
+  }
+  if ($fern -eq $before) {
+    Good ('Die Werkzeuge sind bereits aktuell (nichts Neues auf ' + $upstream + ').')
+    return
+  }
+  if ($nurPruefen) {
+    Warn ('Auf dem Server liegt ' + (Kurz $fern) + ' - beim naechsten Aktualisieren wird das geholt.')
+    $script:Stale += 'Es liegen neuere Werkzeuge bereit und sind NICHT geholt (-Check veraendert nichts)'
+    return
+  }
+
+  Info "hole   : $upstream"
+  # `git pull --ff-only`, EINFACH SO, UND NICHT `git fetch --depth 1` PLUS MERGE.
+  # Gemessen am 05.08.2026 gegen einen echten Klon des Forks mit
+  # --depth 1 --filter=blob:none --sparse: `git pull --ff-only` holt genau die neuen Commits,
+  # faehrt den Zweig vor und LAESST DEN KLON FLACH - die Grenze in .git/shallow bleibt stehen,
+  # .git wuchs dabei von 599 auf 628 KB.
+  # Der naheliegende Umweg `git fetch --depth 1` + `git merge --ff-only FETCH_HEAD` tut genau
+  # das NICHT: --depth 1 setzt die Grenze auf den NEUEN Commit, dessen Elternteil damit lokal
+  # abgeschnitten ist. Der neue Stand ist dann kein Nachfahre des alten mehr, und der Merge
+  # scheitert mit "Not possible to fast-forward" - ebenfalls gemessen, an einem Klon, dessen
+  # shallow-Datei beide Commits nannte. Ein flacher Klon braucht also gerade KEINE besondere
+  # Beschwoerung; er braucht, dass man ihm keine falsche gibt.
+  #
+  # --quiet, weil die Ausgabe hier EINGEFANGEN wird und nicht direkt ins Fenster laeuft. Ohne
+  # das schrieb git seinen Fortschrittsbalken zeilenweise statt mit Wagenruecklauf - gemessen:
+  # 45 Zeilen "Updating files: 51% (104/202)" und danach eine Dateiliste mit 101 Eintraegen, in
+  # der die drei Zeilen untergingen, die etwas aussagen. Was gebraucht wird, steht ohnehin
+  # gleich darunter: vorher, nachher und die geaenderten Werkzeuge mit Namen. Fehlermeldungen
+  # kommen aus stderr und bleiben auch mit --quiet sichtbar.
+  $ausgabe = & $script:GitExe -C $repoPfad pull --ff-only --quiet 2>&1
+  $rc = $LASTEXITCODE
+  $ausgabe | ForEach-Object { Info $_ }
+  if ($rc) {
+    Fail 'werkzeuge' 'git pull --ff-only ist fehlgeschlagen (siehe oben). Es wurde nichts geaendert.'
+  }
+
+  $after = Git-Text '-C' $repoPfad 'rev-parse' 'HEAD'
+  if ($after -and $after -ne $before) {
+    Good ('neu    : ' + (Kurz $after))
+    # WELCHE Werkzeuge sich bewegt haben, mit Namen - dieselbe Zeile, die den Vorfall vom
+    # 28.07.2026 zu einem Nichtereignis gemacht haette.
+    $changed = @(& $script:GitExe -C $repoPfad diff --name-only $before $after -- tools)
+    if ($changed.Count) {
+      Info ('geaenderte Werkzeuge (' + $changed.Count + '):')
+      $changed | ForEach-Object { Info "   $_" }
+    } else {
+      Info 'An den Werkzeugen selbst hat sich nichts geaendert.'
+    }
+    # Dieses Skript kann sich soeben selbst erneuert haben. PowerShell hat die alte Fassung
+    # bereits vollstaendig eingelesen - der Rest dieses Laufs ist die alte.
+    if ($changed | Where-Object { $_ -match 'tools/ing-update\.(ps1|cmd)$' }) {
+      Warn 'Dieses Aktualisieren-Skript wurde selbst erneuert. Der Rest dieses Laufs verwendet noch die alte Fassung.'
+      $script:Stale += 'Bitte noch einmal auf "ING aktualisieren" klicken - die neue Fassung war in diesem Lauf noch nicht in Betrieb.'
+    }
+  } elseif (-not $rc) {
+    Good 'Die Werkzeuge waren bereits aktuell.'
+  }
+}
+
 # ---------------------------------------------------------------- where things are
 
 if (-not $Repo) { $Repo = Split-Path -Parent $PSScriptRoot }
@@ -226,6 +315,11 @@ $gitWo = ''
 $g = Finde-Git
 if ($g) { $script:GitExe = $g.p; $gitWo = $g.wo }
 $gitDa = [bool]$script:GitExe
+# ZIEHT DIESE PAKET-INSTALLATION IHRE WERKZEUGE SELBST NACH? Nur wenn BEIDES da ist: der Klon
+# und ein git, das ihn bedienen kann. Einmal ausgerechnet, damit Schritt 1 und die
+# Zusammenfassung am Ende dieselbe Antwort geben - eine Schlusszeile, die einen Server
+# verspricht, den Schritt 1 nie gefragt hat, ist genau die Sorte Satz, die hier abgestellt wird.
+$paketZiehtNach = ($istPaket -and $hatGitOrdner -and $gitDa)
 if ($istCheckout) {
   Info 'Art   : Arbeitsverzeichnis (git). Werkzeuge, Studio und Plugin werden nachgezogen.'
   if (-not $gitDa) {
@@ -237,12 +331,17 @@ if ($istCheckout) {
   Info ("git   : " + (Git-Text '--version') + "   ($gitWo - $script:GitExe)")
 } elseif ($istPaket) {
   Info "Art   : Tester-Installation aus dem Paket ($PaketRoot)."
-  if ($hatGitOrdner) {
-    # Ein .git im Paket ist kein Grund, es zu benutzen. Der Stand einer Tester-Installation
-    # kommt als neues Paket, nicht ueber einen Server, den dieses Geraet gar nicht erreicht.
-    Info '        Sie bringt zwar ein .git mit, zieht sich aber bewusst nicht selbst nach:'
-    Info '        ein neuerer Stand kommt als neues Paket. Geprueft und wo moeglich in Ordnung'
-    Info '        gebracht wird sie trotzdem.'
+  if ($hatGitOrdner -and $gitDa) {
+    # Ein .git im Paket war bis 05.08.2026 kein Grund, es zu benutzen - es gab keins. Seit das
+    # Paket repo\ als echten Klon UND ein MinGit daneben ausliefert, ist es genau der Grund:
+    # die Werkzeuge kommen ueber den Server, Studio und Plugin weiterhin als Paket.
+    Info '        Sie bringt ein git-Arbeitsverzeichnis und ein eigenes git mit und zieht die'
+    Info '        Werkzeuge damit selbst nach. Studio und Plugin kommen weiter als neues Paket.'
+    Info ("git   : " + (Git-Text '--version') + "   ($gitWo - $script:GitExe)")
+  } elseif ($hatGitOrdner) {
+    Info '        Sie bringt ein git-Arbeitsverzeichnis mit, aber es ist kein git zu finden, mit'
+    Info '        dem sich etwas holen liesse. Geprueft und wo moeglich in Ordnung gebracht wird'
+    Info '        sie trotzdem.'
   } else {
     Info '        Sie enthaelt kein git-Arbeitsverzeichnis und kann sich daher nicht selbst'
     Info '        neu holen. Geprueft und wo moeglich in Ordnung gebracht wird sie trotzdem.'
@@ -472,10 +571,8 @@ $before = ''
 $after  = ''
 
 if (-not $istCheckout) {
-  # PAKET-INSTALLATION. Hier gibt es nichts zu holen, und das ist kein Defekt, sondern die
-  # Bauart: das Paket ist eine Kopie, damit auf dem Geraet der Testerin weder git noch ein
-  # Netzzugang zum Server noetig ist. Gesagt wird, WORAUF sie steht - aus PAKET.txt, das der
-  # Paketbau geschrieben hat - und nicht so getan, als sei etwas nachgezogen worden.
+  # PAKET-INSTALLATION. Gesagt wird zuerst, WORAUF sie steht - aus PAKET.txt, das der Paketbau
+  # geschrieben hat.
   $paketTxt = Join-Path $PaketRoot 'PAKET.txt'
   if (Test-Path -LiteralPath $paketTxt) {
     foreach ($z in (Get-Content -LiteralPath $paketTxt -EA SilentlyContinue)) {
@@ -484,7 +581,94 @@ if (-not $istCheckout) {
   } else {
     Info 'Kein PAKET.txt neben dieser Installation - der Stand steht unten am Plugin.'
   }
-  Info 'Diese Installation holt sich nichts selbst. Ein neuerer Stand kommt als neues Paket.'
+
+  # HIER STAND BIS ZUM 05.08.2026 EIN SATZ, UND ER WAR WAHR:
+  #     "Diese Installation holt sich nichts selbst. Ein neuerer Stand kommt als neues Paket."
+  # Er war wahr, weil repo\ eine reine DATEIKOPIE ohne .git war - tools\build-tester-package.ps1
+  # kopierte bewusst Dateien, und auf einem gesperrten Geraet lag kein git, mit dem sich ein
+  # Klon haette bedienen lassen. Ein Knopf, der unter diesen Umstaenden "aktualisieren" heisst
+  # und nichts holen kann, muss das sagen; das tat der Satz.
+  #
+  # SEIT DEM PAKETBAU VOM 05.08.2026 IST ER FALSCH. Das Paket liefert repo\ als echten Klon des
+  # oeffentlichen Forks aus - flach (--depth 1), sparse auf tools\, .git rund 550 KB - und legt
+  # ein MinGit unter <Paket>\git\ daneben. Damit hat ausgerechnet das Geraet, fuer das der Knopf
+  # ueberhaupt existiert, alles, was zum Nachziehen noetig ist, und dieser Zweig zieht nach.
+  #
+  # WAS NACHGEZOGEN WIRD UND WAS NICHT: die WERKZEUGE unter tools\, sonst nichts. Studio und
+  # Plugin brauchen Maven und einen Bau; die kommen weiter als neues Paket. Ein Update, das
+  # "aktualisiert" sagt und nur die Haelfte meint, muss die andere Haelfte benennen - unten in
+  # der Zusammenfassung steht deshalb beides nebeneinander.
+  if (-not $hatGitOrdner) {
+    Info 'Diese Installation bringt kein git-Arbeitsverzeichnis mit (Paket vor 08.2026) und holt'
+    Info 'sich daher nichts selbst. Ein neuerer Stand kommt als neues Paket.'
+  } elseif (-not $gitDa) {
+    Warn 'Zu dieser Installation gehoert ein git-Arbeitsverzeichnis, aber es ist kein git da, mit'
+    Warn 'dem sich etwas holen liesse. Die Werkzeuge bleiben auf dem Stand des Pakets.'
+    Warn "Gesucht wurde: ING_GIT, dann git\cmd\git.exe und git\bin\git.exe unter $PaketRoot, dann der PATH."
+    $script:Stale += 'kein git in dieser Installation - die Werkzeuge wurden nicht nachgezogen'
+  } else {
+    $branch = Git-Text '-C' $Repo 'rev-parse' '--abbrev-ref' 'HEAD'
+    $before = Git-Text '-C' $Repo 'rev-parse' 'HEAD'
+    Info "Zweig  : $branch"
+    Info ("vorher : " + (Kurz $before))
+    $upstream = Git-Text '-C' $Repo 'rev-parse' '--abbrev-ref' '--symbolic-full-name' '@{u}'
+    if (-not $upstream) {
+      # Ein Paket-Klon ohne Server-Zweig ist ein Fehler des Paketbaus, keiner dieser Installation.
+      # Gemeldet wird er trotzdem hier, weil er hier auffaellt - aber nicht als "kaputt": alles,
+      # was diese Installation kann, kann sie weiterhin.
+      Warn ("Der Zweig " + $branch + " folgt keinem Zweig auf dem Server. Es kann nichts geholt werden.")
+      $script:Stale += 'Paket-Klon ohne Server-Zweig - die Werkzeuge wurden nicht nachgezogen'
+    } else {
+      # KEINE RUECKFRAGE UND KEIN UNBEGRENZTES WARTEN. Ohne GIT_TERMINAL_PROMPT=0 fragt git bei
+      # einer Gegenstelle, die 401 sagt, nach Benutzername und Passwort - in einem Fenster, das
+      # eine Testerin per Doppelklick geoeffnet hat, ist das ein Lauf, der nie zurueckkommt. Und
+      # ohne die beiden LOW_SPEED-Werte haengt ein Netz, das Pakete verschluckt, statt zu
+      # antworten, denselben Lauf minutenlang auf. 1000 Byte/s ueber 20 Sekunden ist kein
+      # langsames Netz mehr, das ist keins.
+      $altPrompt = $env:GIT_TERMINAL_PROMPT
+      $altLimit  = $env:GIT_HTTP_LOW_SPEED_LIMIT
+      $altZeit   = $env:GIT_HTTP_LOW_SPEED_TIME
+      $env:GIT_TERMINAL_PROMPT      = '0'
+      $env:GIT_HTTP_LOW_SPEED_LIMIT = '1000'
+      $env:GIT_HTTP_LOW_SPEED_TIME  = '20'
+      try {
+        # SAUBER ODER GAR NICHT - und niemals stash. Der Satz ist wortgleich zum Entwicklerzweig
+        # weiter unten, aus demselben Grund: ein stash auf dem Rechner eines anderen ist etwas,
+        # das dieser andere nie wiederfindet, und dieses Skript darf nie der Grund sein, aus dem
+        # Arbeit verschwindet. Dass eine Paket-Installation ueberhaupt eigene Aenderungen tragen
+        # KANN, ist neu - vorher war repo\ eine Kopie, an der niemand etwas hatte, das verloren
+        # gehen konnte. Frisch ausgepackt meldet der Klon nichts; steht hier etwas, ist es ein
+        # Eingriff oder ein Defekt, und beides wird BENANNT statt weggeraeumt.
+        #
+        # ZUERST GEFRAGT, VOR JEDEM NETZZUGRIFF, und das ist die Reihenfolge und nicht bloss die
+        # Ersparnis eines Abrufs: laege die Frage hinter dem Vergleich mit dem Server, bliebe
+        # eine verbogene Datei genau dann UNGENANNT, wenn ohnehin nichts zu holen ist - und das
+        # ist der haeufigste Fall. Ein Werkzeug, das erst dann meckert, wenn zufaellig auch ein
+        # neuer Stand bereitliegt, meldet einen Defekt nach Laune.
+        $schmutzig = @(& $script:GitExe -C $Repo status --porcelain)
+        if ($schmutzig) {
+          Fail 'werkzeuge' 'Es liegen eigene Aenderungen im Arbeitsverzeichnis. Bitte erst sichern; es wurde nichts geholt.'
+          $schmutzig | Select-Object -First 10 | ForEach-Object { Info "   $_" }
+          Info 'Die Installation bleibt unveraendert benutzbar und wird unten weiter geprueft.'
+        } elseif ($Check) {
+          Info ("Ein Aktualisieren wuerde hier " + $upstream + " holen (git pull --ff-only).")
+          Info 'Dieser Lauf fragt nur nach und veraendert nichts (-Check).'
+          Melde-Fernstand $Repo $branch $upstream $before $true
+        } else {
+          Melde-Fernstand $Repo $branch $upstream $before $false
+        }
+      } finally {
+        $env:GIT_TERMINAL_PROMPT      = $altPrompt
+        $env:GIT_HTTP_LOW_SPEED_LIMIT = $altLimit
+        $env:GIT_HTTP_LOW_SPEED_TIME  = $altZeit
+      }
+    }
+  }
+  # GEHOLT IST NICHT HEIL. Was jetzt unter tools\ liegt, wird weiter unten in Schritt
+  # "Kontrolle" gegen dieselbe Liste geprueft, die auch de.ing.qa.panel.RepoCheck fuehrt -
+  # derselbe Block, derselbe Lauf, fuer beide Arten von Installation. Ein Klon kann
+  # fehlerfrei vorfahren und danach ein Werkzeug vermissen lassen, und dann ist "geholt" die
+  # Antwort auf eine Frage, die niemand gestellt hat.
 } else {
 
 $branch  = Git-Text '-C' $Repo 'rev-parse' '--abbrev-ref' 'HEAD'
@@ -911,9 +1095,19 @@ if ($script:Stale.Count) {
 if (-not $istCheckout) {
   # DER EINE SATZ, der verlangt wurde: alles, was hier repariert werden konnte, ist
   # repariert - und was ein Mensch tun muss, steht in einem Satz statt in einem Rueckgabewert.
+  # Zwei Faelle, weil es seit dem 05.08.2026 zwei gibt, und der falsche Satz waere in beide
+  # Richtungen ein Schaden: einer Installation, die sich die Werkzeuge holt, "sie holt sich
+  # nichts" zu sagen, kostet Vertrauen in den Knopf; einer ohne Klon das Gegenteil zu sagen,
+  # laesst eine Testerin auf ein Update warten, das nie kommt.
   Write-Host 'Diese Installation ist vollstaendig und startbar.' -ForegroundColor Green
-  Write-Host 'Sie holt sich keinen neuen Stand selbst: dafuer bekommen Sie ein neues Paket von' -ForegroundColor Green
-  Write-Host 'der Testautomatisierung und starten darin einmal INSTALLIEREN.cmd.' -ForegroundColor Green
+  if ($paketZiehtNach) {
+    Write-Host 'Die Werkzeuge holt sie sich bei jedem Aktualisieren selbst vom Server.' -ForegroundColor Green
+    Write-Host 'Ein neues Studio oder ein neues Plugin kommt weiterhin als Paket: dafuer bekommen Sie' -ForegroundColor Green
+    Write-Host 'ein neues Paket von der Testautomatisierung und starten darin einmal INSTALLIEREN.cmd.' -ForegroundColor Green
+  } else {
+    Write-Host 'Sie holt sich keinen neuen Stand selbst: dafuer bekommen Sie ein neues Paket von' -ForegroundColor Green
+    Write-Host 'der Testautomatisierung und starten darin einmal INSTALLIEREN.cmd.' -ForegroundColor Green
+  }
   Write-Host 'Bitte Studio einmal neu starten.' -ForegroundColor Green
   exit 0
 }

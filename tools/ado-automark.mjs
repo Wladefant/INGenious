@@ -45,12 +45,19 @@ const MAX_ATTACH_BYTES = 20 * 1024 * 1024; // 20MB — files above this are skip
  * candidate. {@link config} takes them from the environment or from ing-config.json beside
  * the tools; anything nobody supplied stays EMPTY and fails at first use with a sentence
  * naming the key — never with a guessed organisation, which would write into a stranger's
- * Azure DevOps.
+ * Azure DevOps. A dry run is the one exemption, for the reason spelled out at the getters.
  */
 const CFG = {
-  get org() { return requireValue('org', 'Die Azure-DevOps-Organisation'); },
-  get project() { return requireValue('project', 'Das Azure-DevOps-Projekt'); },
-  get planId() { return parseInt(requireValue('plan', 'Die Id des Testplans'), 10); },
+  // Der Probelauf kommt ohne Organisation aus — dieselbe DRY-Ausnahme, die der Token-Pfad
+  // schon hat (getOrFetchToken gibt bei DRY sofort 'DRY-RUN-TOKEN' zurueck). Ein --dry-run
+  // schreibt diese Namen ausschliesslich in den Plan und oeffnet nie einen Socket; er muss
+  // deshalb auch dort laufen, wo es weder ing-config.json noch ADO_*-Variablen gibt (CI,
+  // fremder Rechner). Geraten wird trotzdem nichts: der echte Lauf besteht unveraendert auf
+  // requireValue und bricht mit dem deutschen Satz ab, statt in eine fremde Organisation zu
+  // schreiben.
+  get org() { return DRY ? (config().org || 'DRY-RUN-ORG') : requireValue('org', 'Die Azure-DevOps-Organisation'); },
+  get project() { return DRY ? (config().project || 'DRY-RUN-PROJECT') : requireValue('project', 'Das Azure-DevOps-Projekt'); },
+  get planId() { return parseInt(DRY ? (config().plan || '0') : requireValue('plan', 'Die Id des Testplans'), 10); },
   // 0 = auto-discover, and an unconfigured suite means exactly that, so this one has an
   // honest default rather than an error.
   get suiteId() { return parseInt(config().suite || '0', 10); },
@@ -609,6 +616,13 @@ function selftestAuth() {
   // test point, and no run is ever created before a point is resolved. If this belt is
   // what stops it, authHeadlessSaysWhat fails and says so.
   env.ADO_TEST_PLAN_ID = '0';
+  // Diesem Kind ist der Probelauf ausdruecklich verwehrt, also greift die DRY-Ausnahme an
+  // den Gettern hier nicht — ohne ing-config.json bliebe es an der Organisation haengen und
+  // erreichte die Auth-Frage nie, die es beantworten soll. Es bekommt darum erkennbar
+  // erfundene Namen mit, nach demselben Muster wie Plan 0 darueber: ohne Token kommt kein
+  // einziger Request zustande, und diese Organisation gibt es nicht.
+  env.ADO_ORG = 'SELFTEST-ORG';
+  env.ADO_PROJECT = 'SELFTEST-PROJECT';
   env.PATH = withShim(process.env.PATH);
   env.AZ_SHIM_LOG = headlessLog;
   const child = spawnSync(process.execPath, [fileURLToPath(import.meta.url), '--test-case', '12345'],

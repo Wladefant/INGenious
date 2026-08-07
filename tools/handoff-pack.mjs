@@ -611,6 +611,11 @@ function pack(args) {
             ? `  results    ${runEvidence.files} file(s), ${human(runEvidence.bytes)} — reports, screenshots, videos, traces, logs`
             : `  results    0 file(s) — this project holds no run output to send`
     );
+    // Counted by the tool that read the TestPlan, so the Studio panel can say "there was
+    // nothing to hand over" instead of "✔ Fertig" over a package that holds only the project
+    // skeleton. A tester who presses abgeben before recording anything gets a valid zip and a
+    // sentence that means they are done — see the panel's showHandoff.
+    console.log(`  testcases  ${manifest.contents.scenarios.reduce((n, s) => n + s.testCases.length, 0)} recorded in TestPlan`);
     console.log(`  sha256     ${sha256(zip)}`);
     console.log(`  ADO cases  ${manifest.adoTestCases.join(', ') || '(none named in test case titles)'}`);
     console.log(`  INGenious  ${manifest.ingenious.version}`);

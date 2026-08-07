@@ -31,10 +31,11 @@
  *   node tools/session-anmelden.mjs --check
  *   node tools/session-anmelden.mjs [--url <adresse>] [--out <datei>] [--ready <selektor>]
  *
- * Exit codes: 0 saved (or, with --check, a usable session exists) · 1 nothing was saved
- * · 2 the browser could not be opened at all.
+ * Exit codes: 0 saved (or, with --check, the saved session is PROVABLY still valid) · 1 nothing
+ * was saved, or nothing in the file proves the saved session is still good · 2 the browser could
+ * not be opened at all.
  */
-import { existsSync, mkdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -121,10 +122,100 @@ function ageHours(file) {
 }
 
 /**
- * Answers "is there a session, and how old is it" without opening anything.
+ * Whether a cookie belongs to the application rather than to the login that guards it.
+ *
+ * The host from the configured address decides when there is one — that is the application,
+ * by definition. Without it the {@link IDP} pattern is the fallback: everything that is
+ * recognisably an identity provider is not the application. The fallback is the weaker of
+ * the two (an application whose own host contains "auth" would be discarded by it), which is
+ * exactly why the configured address is preferred whenever it exists.
+ */
+function isAppCookie(cookie, appHost) {
+  const domain = String(cookie.domain || '').replace(/^\./, '').toLowerCase();
+  if (!domain) return false;
+  if (appHost) return domain === appHost || appHost.endsWith(`.${domain}`);
+  return !IDP.test(domain);
+}
+
+/** A moment a tester reads on a panel, in the notation they write dates in. */
+function moment(epochSeconds) {
+  const d = new Date(epochSeconds * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} `
+    + `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * What the saved file itself can prove about the session — read out of it, not guessed from
+ * how recently it was written.
+ *
+ * WHY THIS REPLACED THE AGE
+ * -------------------------
+ * "Saved 3.3 hours ago" was being reported as "signed in", and the two are not the same
+ * sentence. Measured against the real application on 2026-08-07, a saved state held eighteen
+ * cookies: seventeen for the identity provider — one of them good until November — and
+ * exactly ONE for the application itself, a JSESSIONID carrying no expiry at all. A servlet
+ * container drops that handle after its idle timeout, typically far inside the eight hours
+ * this file used to call "angemeldet". So the panel was green over a session the server had
+ * already forgotten, which is the one failure mode worse than saying nothing.
+ *
+ * The file can prove three different things, and they get three different answers:
+ *   GUELTIG          an application cookie carries an expiry, and it is in the future
+ *   ABGELAUFEN       every application cookie carries an expiry, and all of them have passed
+ *   SITZUNGSKENNUNG  the application cookie carries no expiry — the SERVER decides, and this
+ *                    file cannot answer the question. Age is reported; validity is not claimed
+ *   KEINE            nothing for the application at all: the sign-in never reached it
+ *   UNLESBAR         not a storage state we can read — fall back to the age alone
+ *
+ * <p>Exported because a second tool has to reach the same verdict about the same file:
+ * {@code anmeldung-mitnehmen.mjs} decides from it whether a saved session may be handed to
+ * a recording or a run. Two implementations of "is this session worth anything" would drift,
+ * and the drift would show up as a panel and a run disagreeing about the same file.
+ *
+ * @returns {{kind: string, until: number|null, host: string}}
+ */
+export function cookieVerdict(file, appUrl) {
+  let appHost = '';
+  try {
+    // hostname, NOT host: host carries the port and a cookie domain never does. Against a
+    // demo on 127.0.0.1:8731 the comparison then failed for every cookie in the file and
+    // reported "ohne Sitzung" over a session that was there and working — a false alarm that
+    // sends a tester back through a login they do not need. Caught by that demo run, which is
+    // the only reason this line reads hostname today.
+    appHost = appUrl ? new URL(appUrl).hostname.toLowerCase() : '';
+  } catch {
+    // A malformed address is not worth refusing a check over: the fallback still classifies.
+  }
+  let cookies;
+  try {
+    cookies = JSON.parse(readFileSync(file, 'utf8')).cookies;
+    if (!Array.isArray(cookies)) throw new Error('keine cookies');
+  } catch {
+    return { kind: 'UNLESBAR', until: null, host: appHost };
+  }
+  const mine = cookies.filter((c) => isAppCookie(c, appHost));
+  const host = appHost || (mine.length
+    ? String(mine[0].domain || '').replace(/^\./, '') : '');
+  if (!mine.length) return { kind: 'KEINE', until: null, host };
+  // A cookie without an expiry outlives every dated one in the file: it lasts exactly as long
+  // as the server keeps the session, so no date in here may be presented as its deadline.
+  if (mine.some((c) => !(Number(c.expires) > 0))) {
+    return { kind: 'SITZUNGSKENNUNG', until: null, host };
+  }
+  const latest = Math.max(...mine.map((c) => Number(c.expires)));
+  return { kind: latest * 1000 > Date.now() ? 'GUELTIG' : 'ABGELAUFEN', until: latest, host };
+}
+
+/**
+ * Answers "is there a session, and what does it prove" without opening anything.
  *
  * The panel calls this every time it paints, so it must be cheap and must never be able
  * to put a browser on somebody's screen as a side effect of drawing a label.
+ *
+ * The `SESSION PRESENT` line keeps its shape — the panel and its harness both read it — and
+ * the verdict arrives on a line of its own, so a plugin older than this file loses the detail
+ * and never the answer. Exit 0 now means "still valid, and here is why", not "written
+ * recently": only GUELTIG earns it.
  */
 function reportCheck(state) {
   const age = ageHours(state);
@@ -134,11 +225,36 @@ function reportCheck(state) {
     return 1;
   }
   const hours = age.toFixed(1);
+  const verdict = cookieVerdict(state, DEFAULT_URL);
+  const fuer = verdict.host ? ` fuer ${verdict.host}` : '';
   console.log(`SESSION PRESENT ${hours} ${state}`);
-  console.log(age > STALE_HOURS
-    ? `Die gespeicherte Anmeldung ist ${hours} Stunden alt und vermutlich abgelaufen.`
-    : `Es ist eine Anmeldung von vor ${hours} Stunden gespeichert.`);
-  return age > STALE_HOURS ? 1 : 0;
+  // Host before date, and the date last: it is the only field containing a space, so putting
+  // it at the end is what keeps the line splittable at all.
+  console.log(`SESSION COOKIES ${verdict.kind} ${verdict.host || '-'}`
+    + ` ${verdict.until ? moment(verdict.until) : '-'}`);
+  switch (verdict.kind) {
+    case 'GUELTIG':
+      console.log(`Es ist eine Anmeldung${fuer} gespeichert, gueltig bis `
+        + `${moment(verdict.until)}.`);
+      return 0;
+    case 'ABGELAUFEN':
+      console.log(`Die gespeicherte Anmeldung${fuer} ist seit ${moment(verdict.until)} `
+        + 'abgelaufen.');
+      return 1;
+    case 'SITZUNGSKENNUNG':
+      console.log(`Gespeichert vor ${hours} Stunden. Die Sitzungskennung${fuer} traegt kein `
+        + 'Ablaufdatum — wie lange sie gilt, entscheidet die Anwendung.');
+      return 1;
+    case 'KEINE':
+      console.log(`Gespeichert vor ${hours} Stunden, aber ohne Sitzung${fuer} — die Anmeldung `
+        + 'hat die Anwendung nicht erreicht.');
+      return 1;
+    default:
+      console.log(age > STALE_HOURS
+        ? `Die gespeicherte Anmeldung ist ${hours} Stunden alt und vermutlich abgelaufen.`
+        : `Es ist eine Anmeldung von vor ${hours} Stunden gespeichert.`);
+      return age > STALE_HOURS ? 1 : 0;
+  }
 }
 
 async function main() {
@@ -205,7 +321,15 @@ async function main() {
       // The generic one, for any application with no configured ready-selector: on the target host,
       // away from the identity provider, and still there ten seconds later. The dwell is
       // what keeps a redirect passing through from counting as an arrival.
-      if (onTarget) {
+      //
+      // ONLY when no selector is configured, and that condition is the whole point. Without
+      // it the dwell also fired for an application that HAS one — measured against a demo
+      // whose login lives on the same host as the application: ten seconds on the login page
+      // counted as "die Anwendung wird seit einigen Sekunden angezeigt", the state was saved
+      // with zero cookies in it, and the tester was told "✔ Angemeldet" about a sign-in that
+      // had not happened. A configured selector is a precise statement of what arriving means;
+      // when it never appears, the honest answer is the timeout, not a saved file.
+      if (onTarget && !args.ready) {
         if (!settledSince) settledSince = Date.now();
         else if (Date.now() - settledSince > 10_000) {
           why = 'die Anwendung wird seit einigen Sekunden angezeigt';
