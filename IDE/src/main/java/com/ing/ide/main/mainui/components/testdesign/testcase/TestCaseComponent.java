@@ -51,6 +51,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -61,6 +62,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -999,6 +1001,16 @@ public class TestCaseComponent extends JPanel implements ActionListener {
             .replace("\\", "\\\\")
             .replace("\"", "\\\"");
         String processArgs = "codegen --target java --output \"" + escapedPath + "\"";
+        String storageStateArgs = storageStateArgs(sMainFrame.getProject().getLocation());
+        // Said out loud on every launch: a recorder that silently did or did not carry the
+        // sign-in over is the exact ambiguity this setting exists to remove.
+        logPlaywright(
+            storageStateArgs.isEmpty()
+                ? "No saved browser session configured. The recorder starts signed out."
+                : "Saved browser session reused:" + storageStateArgs
+        );
+        // Before the start URL: that one is positional, everything after it is no longer an option.
+        processArgs += storageStateArgs;
         if (startUrl != null) {
             // Quoted: the command is handed to cmd/bash as one string, and an unquoted query
             // string would be cut at its first '&'. Validation upstream has already ruled out
@@ -1009,6 +1021,68 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         logPlaywright(
             "============================== Playwright Log Ended =============================="
         );
+    }
+
+    /**
+     * The codegen option that starts the recorder from the browser session the project has saved.
+     *
+     * <p>
+     * Recording used to always begin at the application's login page while a run of the same
+     * application began signed in, because {@code Settings/BrowserContexts/default.properties} was
+     * only ever read by the engine. Reading the same two keys here is what makes the one switch
+     * govern both.
+     * </p>
+     *
+     * <p>
+     * The file is read on every launch instead of through the project's settings object, because
+     * the browser-context panel writes it while Studio is running and a value taken at project-open
+     * time would be the previous one.
+     * </p>
+     *
+     * @param projectLocation location of the open project
+     * @return {@code --load-storage "<path>"} including its leading space, or {@code ""} when the
+     *         project has no usable saved session
+     */
+    static String storageStateArgs(String projectLocation) {
+        if (projectLocation == null) {
+            return "";
+        }
+        File contextFile = new File(
+            projectLocation +
+            File.separator +
+            "Settings" +
+            File.separator +
+            "BrowserContexts" +
+            File.separator +
+            "default.properties"
+        );
+        try (InputStream contextStream = new FileInputStream(contextFile)) {
+            Properties contextDetails = new Properties();
+            contextDetails.load(contextStream);
+            if (!Boolean.parseBoolean(contextDetails.getProperty("useStorageState"))) {
+                return "";
+            }
+            String storageStatePath = contextDetails.getProperty("storageStatePath", "").trim();
+            // Codegen aborts on a state file it cannot open, which would mean no recorder at all;
+            // landing on the login page is the better of the two failures. The engine skips a
+            // missing file for the same reason, so both stay silent about it in the same way.
+            if (storageStatePath.isEmpty() || !new File(storageStatePath).exists()) {
+                return "";
+            }
+            // Escaped like --output above: this ends up inside double quotes in a single command
+            // string, so a Windows path's backslashes have to survive the shell.
+            return (
+                " --load-storage \"" +
+                storageStatePath.replace("\\", "\\\\").replace("\"", "\\\"") +
+                "\""
+            );
+        } catch (IOException | RuntimeException ex) {
+            // Unreadable settings must not cost the tester the recording itself.
+            System.err.println(
+                "Could not read " + contextFile + ", recording without a saved session: " + ex
+            );
+            return "";
+        }
     }
 
     private Process runPlaywrightProcess(String processArgs) throws IOException {
