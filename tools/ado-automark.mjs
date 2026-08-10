@@ -18,9 +18,13 @@
 // Usage:
 //   node ado-automark.mjs --test-case 12345 --evidence "C:\\path\\to\\Evidence" [--plan 678] [--suite 0] [--comment "..."] [--attach "C:\\path\\clip.webm" --attach "C:\\path\\log.html"] [--dry-run]
 //   node ado-automark.mjs --selftest        # offline dry-run + assertions (no az, no network)
+//   node ado-automark.mjs --test-case 12345 --nur-belege --attach "C:\\path\\clip.webm"
 // --attach may repeat; each file (any extension: .zip/.webm/.html/.png…) is attached to the test
 // RESULT (GeneralAttachment) AND linked on the work item. Files >20MB are skipped; missing files logged.
-// Programmatic: import { markPassed } from './ado-automark.mjs'
+// --nur-belege legt Anhänge und Kommentar NUR am Arbeitselement ab: kein Testlauf, kein Ergebnis,
+// kein Request an /test/runs — für den roten Automaten, dessen Testfall die Person von Hand
+// bestanden hat (#259). Siehe attachEvidence().
+// Programmatic: import { markPassed, attachEvidence } from './ado-automark.mjs'
 //
 // Defaults (override via env ADO_ORG/ADO_PROJECT/ADO_TEST_PLAN_ID/ADO_TEST_SUITE_ID/ADO_AUTOPILOT_DRYRUN):
 import { spawnSync } from 'node:child_process';
@@ -421,6 +425,8 @@ async function attachToResult(baseUrl, runId, resultId, token, filePath) {
 }
 
 // Link one file on the WORK ITEM — upload to /wit/attachments then PATCH an AttachedFile relation.
+// Returns whether the file really landed: attachEvidence counts belegs and a count that includes
+// the ones that failed is the kind of number nobody can act on.
 async function linkToWorkItem(org, project, testCaseId, token, filePath) {
   try {
     const bytes = DRY ? Buffer.from('DRY') : readFileSync(filePath);
@@ -428,7 +434,8 @@ async function linkToWorkItem(org, project, testCaseId, token, filePath) {
     const patchBody = [{ op: 'add', path: '/relations/-', value: { rel: 'AttachedFile', url: upload.url, attributes: { comment: 'ado-automark evidence ' + nowIso() } } }];
     await adoFetch('PATCH', 'https://dev.azure.com/' + org + '/' + project + '/_apis/wit/workitems/' + testCaseId + '?api-version=' + API_VERSION, token, patchBody, 'application/json-patch+json');
     log('attached ' + basename(filePath) + ' to work item ' + testCaseId + '.');
-  } catch (e) { log('failed to attach ' + basename(filePath) + ' to work item: ' + e.message); }
+    return true;
+  } catch (e) { log('failed to attach ' + basename(filePath) + ' to work item: ' + e.message); return false; }
 }
 
 function stepOutcomesFromXml(stepsXml) {
@@ -534,6 +541,78 @@ export async function markPassed(opts) {
   return { ok: true, runId, resultId, suiteId: effSuite, pointId, runUrl };
 }
 
+/* ----------------------------- Belege ohne Ergebnis ----------------------------- */
+
+/** Damit ein Fehlertext aus einem Lauf-Protokoll das Kommentar-HTML nicht zerlegt. */
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Belege eines Laufs nach Azure DevOps bringen, OHNE irgendein Ergebnis zu schreiben.
+ *
+ * <p>Der Fall, für den es das gibt: der Automat ist ROT durchgelaufen, die Person hat den Test
+ * aber von Hand durchgeführt und bestanden gemeldet
+ * (https://github.com/Wladefant/ing-qa-automation/issues/259). Video, Trace, Berichte und
+ * Protokolle gehören dann trotzdem an den Testfall — das Ergebnis dagegen ist bereits gesetzt
+ * und gehört der Person.
+ *
+ * <p><b>Warum ausschliesslich das Arbeitselement.</b> Jeder Weg über {@code /test/runs} legt
+ * einen Testlauf an, der an einem Testpunkt hängt, und der zuletzt angelegte Lauf entscheidet,
+ * was am Testpunkt steht — auch dann, wenn gar kein Outcome gepatcht wird, denn ein frisch
+ * angelegtes Ergebnis trägt {@code Unspecified}. Ein solcher Lauf würde also genau das
+ * überschreiben, was hier unangetastet bleiben muss. Deshalb wird hier kein einziger Request an
+ * {@code /test/runs} gestellt: Anhänge gehen an {@code /wit/attachments} und werden am
+ * Arbeitselement verlinkt, dazu ein Kommentar. Keiner dieser Endpunkte kennt ein Testergebnis.
+ *
+ * @param {object} opts testCaseId, evidence (Ordner, für die .docx), attach (Dateien), comment
+ * @returns {Promise<object>} {ok, mode:'belege', attached, workItemUrl} oder {ok:false, reason}
+ */
+export async function attachEvidence(opts) {
+  const org = opts.org || CFG.org;
+  const project = opts.project || CFG.project;
+  const testCaseId = Number(opts.testCaseId);
+  if (!testCaseId) throw new Error('--test-case <id> required');
+
+  const token = opts.token || getOrFetchToken();
+  if (!token) { log('no usable token — skipping ADO evidence upload.'); return { ok: false, reason: 'no-token' }; }
+
+  // Die .docx findet dieser Pfad selbst, genau wie markPassed — ado-upload.mjs lässt sie aus
+  // seiner --attach-Liste heraus, damit sie nicht zweimal hochgeladen wird.
+  const docx = findDocx(opts.evidence || null);
+  const files = validateAttachments(opts.attach);
+  const all = [];
+  const seen = new Set();
+  for (const p of (docx ? [docx, ...files] : files)) {
+    const key = String(p).replace(/\\/g, '/').toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    all.push(p);
+  }
+
+  let attached = 0;
+  for (const f of all) {
+    if (await linkToWorkItem(org, project, testCaseId, token, f)) attached++;
+  }
+
+  const extraComment = String(opts.comment || '').trim();
+  const workItemUrl = 'https://dev.azure.com/' + org + '/' + project + '/_workitems/edit/' + testCaseId;
+  try {
+    const html = '<div><p><strong>Belege eines automatischen Laufs</strong> - ' + nowIso() + '</p><ul>'
+      + '<li>' + attached + ' Datei(en) an diesem Arbeitselement abgelegt.</li>'
+      + '<li><strong>Das Testfall-Ergebnis wurde NICHT verändert</strong> — es wurde kein Testlauf '
+      + 'angelegt und kein Ergebnis gesetzt.</li></ul>'
+      + (extraComment ? '<p>' + escapeHtml(extraComment) + '</p>' : '')
+      + '</div>';
+    await adoFetch('POST', 'https://dev.azure.com/' + org + '/' + project + '/_apis/wit/workItems/' + testCaseId + '/comments?api-version=' + API_VERSION + '-preview.4', token, { text: html });
+  } catch (e) { log('failed to add work-item comment: ' + e.message); }
+
+  log('DONE. ' + attached + ' Beleg(e) an Testfall ' + testCaseId + ' — kein Ergebnis geschrieben. ' + workItemUrl);
+  return { ok: true, mode: 'belege', attached, testCaseId, workItemUrl };
+}
+
 function basename(p) { return String(p).split(/[\\/]/).pop(); }
 function nowIso() { return new Date(__now()).toISOString(); }
 // __now indirection keeps the file testable without real clocks if ever needed.
@@ -549,6 +628,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === '--dry-run') o.dryRun = true;
     else if (a === '--selftest') o.selftest = true;
+    else if (a === '--nur-belege') o.nurBelege = true;
     else if (a === '--attach') { (o.attach = o.attach || []).push(argv[i + 1]); i++; }
     else if (a.startsWith('--')) { o[a.slice(2)] = argv[i + 1]; i++; }
   }
@@ -570,6 +650,46 @@ function parseArgs(argv) {
  * Neither case reaches the network: the first returns before the first fetch, the second
  * never obtains a token at all.
  */
+/**
+ * Der Beleg-Pfad, gemessen an seinen eigenen Requests.
+ *
+ * <p>Die tragende Zusicherung von #259 ist eine NEGATIVE: ein roter Lauf lädt seine Belege hoch
+ * und schreibt dabei nirgends ein Ergebnis. Eine negative Zusicherung lässt sich nur prüfen,
+ * indem man alles anschaut, was der Aufruf abgesetzt hat — deshalb wird hier die Länge des
+ * dryPlan vor dem Aufruf gemerkt und ausschliesslich der Rest bewertet. Ein
+ * {@code dryPlan.some(...)} über den ganzen Plan hätte die Requests von markPassed mitgelesen
+ * und wäre grün geblieben, egal was dieser Pfad tut.
+ */
+async function selftestBelege(pngPath, zipPath, bigPath) {
+  const from = dryPlan.length;
+  const realSizeOf = __sizeOf;
+  __sizeOf = (p) => p.endsWith('selftest-big.webm') ? 25 * 1024 * 1024 : realSizeOf(p);
+  const res = await attachEvidence({
+    testCaseId: 12345, evidence: null, comment: 'Automatischer Lauf ROT - TimeoutError am Schritt 2',
+    attach: [pngPath, zipPath, bigPath, join(tmpdir(), 'ado-automark-selftest-missing.zip')],
+  });
+  __sizeOf = realSizeOf;
+  const mine = dryPlan.slice(from);
+  const json = JSON.stringify(mine);
+  return {
+    belegeOk: res.ok === true && res.mode === 'belege' && res.attached === 2,
+    belegeUploadsFiles: mine.filter((c) => c.method === 'POST' && /\/wit\/attachments\?fileName=/.test(c.url)).length === 2,
+    belegeLinksThem: mine.filter((c) => c.method === 'PATCH' && /\/wit\/workitems\/12345\?/.test(c.url)
+      && Array.isArray(c.body) && c.body[0] && c.body[0].value && c.body[0].value.rel === 'AttachedFile').length === 2,
+    belegeComments: mine.some((c) => c.method === 'POST' && /\/wit\/workItems\/12345\/comments\?/.test(c.url)),
+    belegeCommentSaysUnchanged: mine.some((c) => c.method === 'POST' && /\/comments\?/.test(c.url)
+      && c.body && /NICHT verändert/.test(String(c.body.text))),
+    belegeCommentCarriesTheRedStep: mine.some((c) => c.method === 'POST' && /\/comments\?/.test(c.url)
+      && c.body && /TimeoutError am Schritt 2/.test(String(c.body.text))),
+    belegeBigSkipped: !/selftest-big/.test(json),
+    belegeMissingSkipped: !/selftest-missing/.test(json),
+    // DIE Zusicherung: kein einziger Request an die Testlauf-API, und nirgends ein Outcome.
+    belegeTouchesNoTestRun: !mine.some((c) => /\/test\/runs/.test(c.url)),
+    belegeWritesNoOutcome: !/"outcome"/i.test(json),
+    belegeNamesNoResult: res.runId === undefined && res.resultId === undefined,
+  };
+}
+
 function selftestAuth() {
   const dir = mkdtempSync(join(tmpdir(), 'ado-automark-auth-'));
   const shimDir = join(dir, 'bin');
@@ -693,6 +813,10 @@ async function main() {
       attachResultCount: dryPlan.filter((c) => c.method === 'POST' && /\/test\/runs\/99999\/results\/88888\/attachments\?/.test(c.url)).length === 2,
       attachBigSkipped: !dryPlan.some((c) => /selftest-big\.webm/.test(c.url) || (c.body && JSON.stringify(c.body).includes('selftest-big'))),
       attachMissingSkipped: !dryPlan.some((c) => /selftest-missing/.test(c.url) || (c.body && JSON.stringify(c.body).includes('selftest-missing'))),
+      // --nur-belege: der Beleg-Pfad des roten Automaten (#259). Was er tun MUSS, steht unten;
+      // was er nicht tun darf, ist die eigentliche Zusicherung — kein /test/runs, nirgends ein
+      // Outcome. Gemessen an genau den Requests, die dieser Aufruf abgesetzt hat.
+      ...(await selftestBelege(pngPath, zipPath, bigPath)),
       // Auth: the pipeline-facing half. Runs last so a failure here cannot be confused
       // with a failure of the lifecycle above.
       ...selftestAuth(),
@@ -707,12 +831,16 @@ async function main() {
     return;
   }
 
-  if (!a['test-case']) { console.error('Usage: node ado-automark.mjs --test-case <id> [--evidence <folder>] [--plan N] [--suite N] [--comment "..."] [--attach <file> ...] [--dry-run]'); process.exit(2); }
+  if (!a['test-case']) { console.error('Usage: node ado-automark.mjs --test-case <id> [--evidence <folder>] [--plan N] [--suite N] [--comment "..."] [--attach <file> ...] [--nur-belege] [--dry-run]'); process.exit(2); }
   try { mkdirSync(join(process.cwd(), 'generated'), { recursive: true }); } catch {}
-  const res = await markPassed({
-    testCaseId: a['test-case'], evidence: a.evidence, comment: a.comment, label: a.label, attach: a.attach,
-    planId: a.plan ? parseInt(a.plan, 10) : undefined, suiteId: a.suite != null ? parseInt(a.suite, 10) : undefined,
-  });
+  const res = a.nurBelege
+    ? await attachEvidence({
+      testCaseId: a['test-case'], evidence: a.evidence, comment: a.comment, attach: a.attach,
+    })
+    : await markPassed({
+      testCaseId: a['test-case'], evidence: a.evidence, comment: a.comment, label: a.label, attach: a.attach,
+      planId: a.plan ? parseInt(a.plan, 10) : undefined, suiteId: a.suite != null ? parseInt(a.suite, 10) : undefined,
+    });
   if (DRY) { writeFileSync(join(process.cwd(), 'generated', 'ado-automark-plan.json'), JSON.stringify(dryPlan, null, 2), 'utf8'); log('dry-run plan -> generated/ado-automark-plan.json (' + dryPlan.length + ' calls)'); }
   console.log(JSON.stringify(res));
   process.exit(res.ok ? 0 : 1);

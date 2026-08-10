@@ -42,6 +42,17 @@
 // Comment policy: by default the comment is the ADO test case id and NOTHING else.
 // The execution record lives in a production system; an account number or any other
 // customer detail only travels when a caller passes --comment explicitly.
+//
+// EIN ROTER LAUF LÄDT SEINE BELEGE TROTZDEM HOCH — UND SETZT KEIN ERGEBNIS (#259).
+// Bis zum 07.08.2026 wurde ein Lauf mit --outcome failed komplett abgewiesen; Video, Trace und
+// Berichte erreichten Azure DevOps nie, obwohl die Person den Testfall von Hand durchgeführt und
+// bestanden gemeldet hatte. Jetzt geht ein solcher Lauf auf den Beleg-Pfad: ado-automark
+// --nur-belege hängt die Dateien am Arbeitselement an und kommentiert sie, stellt aber keinen
+// einzigen Request an /test/runs — es gibt dort also nichts, was ein Ergebnis setzen könnte.
+// Der Grundsatz "ado-automark markiert ausschliesslich Bestanden" gilt für ERGEBNISSE
+// unverändert; das manuell gemeldete Passed bleibt stehen. Jeder Beleg-Upload nennt dazu im
+// Kommentar Zeitstempel und Ausgang seines Laufs (laufNotiz), damit nie wieder offen ist, aus
+// welcher Durchführung ein Video stammt.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync, appendFileSync } from 'node:fs';
 import { dirname, join, basename, isAbsolute, resolve } from 'node:path';
@@ -353,6 +364,172 @@ export function coveredNote(covered) {
   return ', ' + covered.length + ' Screenshot(s) im Dokument ' + covered[0].in;
 }
 
+/* ------------------------------------------------------- Ausgang des Laufs --- */
+
+/**
+ * Wann dieser Lauf fertig war — die Zeit, die im Beleg-Kommentar steht.
+ *
+ * <p>Genommen aus den Berichtsdateien und nicht aus dem Ordnernamen: die Engine benennt ihre
+ * Lauf-Ordner lokalisiert ({@code 28-Juli-2026 02-12-42}), collect-artifacts schreibt
+ * {@code run-20260727-201500}, und die Abgabe legt noch eine dritte Form an. Die Berichtsdatei
+ * gibt es in allen drei Fällen, und sie ist dieselbe Datei, an der AdoRunWatcher.reportStamp
+ * einen Lauf als fertig erkennt.
+ *
+ * @returns {Date|null} null, wenn hier gar kein Lauf liegt — dann ist der Ordner eine Aufnahme
+ *   oder ein leerer Belegordner, und über einen Lauf ist nichts zu sagen
+ */
+export function runStamp(folder) {
+  if (!folder || !existsSync(folder)) return null;
+  let newest = 0;
+  let entries;
+  try { entries = readdirSync(folder, { withFileTypes: true }); } catch { return null; }
+  for (const e of entries) {
+    if (!e.isFile()) continue;
+    const name = e.name.toLowerCase();
+    if (name !== 'data.js' && !name.endsWith('-v2.html')) continue;
+    try {
+      const st = statSync(join(folder, e.name));
+      if (st.size === 0) continue;               // der Null-Byte-Platzhalter ist kein Bericht
+      newest = Math.max(newest, st.mtimeMs);
+    } catch { /* weiter */ }
+  }
+  return newest > 0 ? new Date(newest) : null;
+}
+
+/** "21.07.2026 01:06" — dieselbe Schreibweise, die Abgabe.java einem Tester zeigt. */
+function whenText(date) {
+  const p = (n) => String(n).padStart(2, '0');
+  return p(date.getDate()) + '.' + p(date.getMonth() + 1) + '.' + date.getFullYear()
+    + ' ' + p(date.getHours()) + ':' + p(date.getMinutes());
+}
+
+/**
+ * Ob dieser Lauf rot war, gemessen am Bericht des Laufs selbst.
+ *
+ * <p>{@code data.js} zählt pro Ausführung {@code nofailTests}; im echten roten Fixture steht
+ * dort "16", im grünen "0". Gelesen wird der Bericht und nicht das {@code --outcome} des
+ * Aufrufers, weil die beiden verschiedene Fragen beantworten: bei der Abgabe ist
+ * {@code --outcome passed} die Unterschrift der PERSON, während der beigelegte Lauf sehr wohl
+ * rot gewesen sein kann. Ein Kommentar, der dann "Automatischer Lauf GRÜN" behauptet, wäre
+ * genau die Verwechslung, die #259 abstellt.
+ *
+ * @returns {{red: boolean, failed: number}|null} null, wenn es keinen lesbaren Bericht gibt
+ */
+export function runVerdict(folder) {
+  if (!folder) return null;
+  const dataJs = join(folder, 'data.js');
+  if (!existsSync(dataJs)) return null;
+  try {
+    const text = readFileSync(dataJs, 'utf8');
+    const start = text.indexOf('{');
+    if (start < 0) return null;
+    const doc = JSON.parse(text.slice(start).replace(/;\s*$/, ''));
+    const runs = Array.isArray(doc.EXECUTIONS) ? doc.EXECUTIONS : [];
+    if (!runs.length) return null;
+    let failed = 0;
+    for (const r of runs) failed += Number(r.nofailTests) || 0;
+    return { red: failed > 0, failed };
+  } catch {
+    return null;
+  }
+}
+
+/** Kein Anführungszeichen, keine Zeilenumbrüche — der Text reist als ein argv-Element. */
+function oneLine(s, max = 160) {
+  const flat = String(s).replace(/[\r\n]+/g, ' ').replace(/"/g, "'").replace(/\s{2,}/g, ' ').trim();
+  return flat.length > max ? flat.slice(0, max - 1) + '…' : flat;
+}
+
+/**
+ * Der ERSTE rote Schritt eines Laufs, als ein Satz — nicht der ganze Stacktrace.
+ *
+ * <p>Die Lauf-Protokolle unter {@code logs/<Testfall>.txt} schreiben pro Schritt einen Kopf und
+ * darunter im Fehlerfall den Fehlerblock:
+ *
+ * <pre>
+ * Step:2  |  Object:Username  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 01:06:25
+ * [FAIL]   | Error: Error {
+ *   message='Timeout 30000ms exceeded.
+ *   name='TimeoutError
+ * </pre>
+ *
+ * <p>Daraus wird {@code TimeoutError am Schritt 2 (Username/Click): Timeout 30000ms exceeded.}
+ * Der erste Fehler, weil alles danach meist Folgefehler desselben Problems ist — im echten
+ * roten Fixture sind es sechzehn Zeitüberschreitungen hinter einer abgelehnten Verbindung.
+ *
+ * @returns {string|null} der Satz, oder null wenn in den Protokollen kein Fehler steht
+ */
+export function firstFailure(folder) {
+  if (!folder || !existsSync(folder)) return null;
+  const files = [];
+  const logs = join(folder, 'logs');
+  if (existsSync(logs)) {
+    try {
+      for (const n of readdirSync(logs).sort()) {
+        if (n.toLowerCase().endsWith('.txt')) files.push(join(logs, n));
+      }
+    } catch { /* weiter */ }
+  }
+  const console_ = join(folder, 'console.txt');
+  if (existsSync(console_)) files.push(console_);
+
+  for (const file of files) {
+    let lines;
+    try { lines = readFileSync(file, 'utf8').split(/\r?\n/); } catch { continue; }
+    let step = null;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const head = line.match(/^Step:(\S+)\s*\|\s*Object:(.*?)\s*\|\s*Action:(.*?)\s*\|/);
+      if (head) { step = { no: head[1], object: head[2].trim(), action: head[3].trim() }; continue; }
+      if (!/^\[FAIL\]/.test(line.trim())) continue;
+      let message = '';
+      let name = '';
+      for (let j = i; j < Math.min(i + 12, lines.length); j++) {
+        const m = lines[j].match(/^\s*message='(.*)$/);
+        if (m && !message) message = m[1];
+        const n = lines[j].match(/^\s*name='(.*)$/);
+        if (n && !name) name = n[1];
+      }
+      const wo = step
+        ? ' am Schritt ' + step.no
+          + (step.object || step.action ? ' (' + [step.object, step.action].filter(Boolean).join('/') + ')' : '')
+        : '';
+      const was = (name || 'Fehler') + wo;
+      return oneLine(message ? was + ': ' + message : was);
+    }
+  }
+  return null;
+}
+
+/**
+ * Der Satz, der an jedem Beleg-Upload hängt: WANN der Lauf war und WIE er ausging.
+ *
+ * <p>Der zweite Teil von #259 — "es wird immer das falsche Video hochgeladen" war in Wahrheit
+ * "man sieht dem Video nicht an, aus welcher Durchführung es stammt". Ein Beleg ohne Zeitstempel
+ * und ohne Ausgang lässt die Frage offen; mit beiden ist sie beantwortet.
+ *
+ * <p>Kein Lauf im Ordner (die Abgabe hängt die Aufnahme selbst an) heisst: nichts behaupten.
+ * Der Kommentar der Abgabe sagt dort ohnehin, dass gar kein Automat gelaufen ist.
+ *
+ * @returns {string} der Satz, oder '' wenn im Ordner kein Lauf liegt
+ */
+export function laufNotiz(folder) {
+  const stamp = runStamp(folder);
+  if (!stamp) return '';
+  const verdict = runVerdict(folder);
+  const failure = firstFailure(folder);
+  const red = (verdict && verdict.red) || (!verdict && !!failure);
+  const wann = 'Beleg-Lauf vom ' + whenText(stamp) + '.';
+  if (red) {
+    return 'Automatischer Lauf ROT — ' + (failure || 'der Bericht zählt '
+      + ((verdict && verdict.failed) || 0) + ' fehlgeschlagene(n) Schritt(e); der erste Fehler '
+      + 'steht in den beiliegenden Protokollen') + '. ' + wann
+      + ' Das Testfall-Ergebnis wurde dadurch NICHT verändert — hochgeladen wurden nur Belege.';
+  }
+  if (verdict) return 'Automatischer Lauf GRÜN. ' + wann;
+  return 'Automatischer Lauf: Ausgang aus dem Bericht nicht lesbar. ' + wann;
+}
+
 /* -------------------------------------------------------------- receipt ------ */
 
 export function logsDir(env = process.env) {
@@ -490,7 +667,12 @@ export async function upload(args, env = process.env) {
     // worth anything if it can be audited from the evidence we keep, including from the
     // paths that return early — and including the caller's choice, which is how the Java
     // side's passed/failed ternary (AdoUpload.upload) becomes observable at all.
+    //
+    // Seit #259 entscheidet dieses Feld nicht mehr über HOCHLADEN oder NICHT, sondern über
+    // MARKIEREN oder NUR BELEGEN — was es umso mehr zum Feld macht, an dem sich im Nachhinein
+    // prüfen lässt, dass kein roter Lauf je auf Bestanden gesetzt wurde. Siehe evidenceOnly.
     outcome: args.outcome == null ? null : String(args.outcome),
+    evidenceOnly: false,
     evidenceFolder: null, attached: [], skipped: [], covered: [], document: null,
     runId: null, runUrl: null, message: '', automarkExit: null, comment: null,
   };
@@ -505,14 +687,15 @@ export async function upload(args, env = process.env) {
       + 'noch Evidenzordner, noch selected-testcase.json) — nichts hochgeladen.';
     return receipt;
   }
-  // ado-automark marks Passed and only Passed. A failed run must never be dressed
-  // up as a pass, so the negative outcome is refused here rather than mis-marked.
-  if (args.outcome && String(args.outcome).toLowerCase() !== 'passed') {
-    receipt.status = 'UEBERSPRUNGEN';
-    receipt.message = 'Ergebnis "' + args.outcome + '" — ADO-Upload übersprungen; '
-      + 'ado-automark markiert ausschließlich Bestanden.';
-    return receipt;
-  }
+  // ado-automark markiert Bestanden und ausschliesslich Bestanden — das gilt für ERGEBNISSE
+  // unverändert weiter. Ein roter Lauf wird deshalb nicht mehr komplett übersprungen, sondern
+  // auf den Beleg-Pfad geschickt: --nur-belege legt Anhänge und Kommentar am Arbeitselement ab
+  // und stellt keinen einzigen Request an die Testlauf-API, kann also weder Bestanden noch
+  // Durchgefallen schreiben (#259). Bis zum 07.08.2026 erreichten Video, Trace und Berichte
+  // eines roten Nachspiel-Laufs Azure DevOps nie — obwohl die Person den Testfall von Hand
+  // durchgeführt und bestanden gemeldet hatte und die Belege genau dorthin gehören.
+  const evidenceOnly = !!args.outcome && String(args.outcome).trim().toLowerCase() !== 'passed';
+  receipt.evidenceOnly = evidenceOnly;
 
   const folder = args.evidence
     ? (isAbsolute(args.evidence) ? args.evidence : resolve(process.cwd(), args.evidence))
@@ -563,11 +746,18 @@ export async function upload(args, env = process.env) {
   receipt.skipped = evidence.skipped;
   receipt.covered = evidence.covered;
 
-  // Comment policy: the id and nothing else unless a caller opts into more.
-  const comment = args.comment && String(args.comment).trim() ? String(args.comment).trim() : String(adoId);
+  // Comment policy: the id and nothing else unless a caller opts into more. Dazu kommt — immer,
+  // auch beim grünen Lauf — die Notiz, aus WELCHER Durchführung die Belege stammen: Zeitstempel
+  // und Ausgang. Angehängt und nicht ersetzt, weil der Kommentar der Abgabe die Unterschrift der
+  // Person trägt und die hier nicht überschrieben werden darf.
+  const base = args.comment && String(args.comment).trim() ? String(args.comment).trim() : String(adoId);
+  const notiz = laufNotiz(evidence.folder && evidence.exists ? evidence.folder : null);
+  const comment = notiz ? base + ' ' + notiz : base;
   receipt.comment = comment;
+  receipt.laufNotiz = notiz || null;
 
   const argv = ['--test-case', String(adoId), '--label', String(adoId), '--comment', comment];
+  if (evidenceOnly) argv.push('--nur-belege');
   if (evidence.folder && evidence.exists) argv.push('--evidence', evidence.folder);
   for (const f of evidence.files) argv.push('--attach', f.path);
   if (args['dry-run']) argv.push('--dry-run');
@@ -593,7 +783,21 @@ export async function upload(args, env = process.env) {
       receipt.status = 'PROBELAUF';
       receipt.dryRun = true;
       receipt.message = 'Probelauf: ' + evidence.files.length + ' Datei(en) wären angehängt worden'
-        + coveredNote(evidence.covered) + skippedNote(evidence.skipped) + ' — es wurde NICHTS nach ADO geschrieben.';
+        + coveredNote(evidence.covered) + skippedNote(evidence.skipped)
+        + (evidenceOnly ? ' (nur Belege, ohne Ergebnis)' : '')
+        + ' — es wurde NICHTS nach ADO geschrieben.';
+      return receipt;
+    }
+    if (evidenceOnly) {
+      // Kein runId, weil kein Testlauf angelegt wurde — das ist hier die Zusicherung und nicht
+      // eine fehlende Angabe. Der Status ist OK, weil die Belege wirklich in Azure DevOps
+      // liegen; der Satz sagt im selben Atemzug, dass das Ergebnis unangetastet blieb.
+      receipt.status = 'OK';
+      receipt.workItemUrl = run.result.workItemUrl || null;
+      receipt.message = 'Belege am Testfall ' + adoId + ' abgelegt: ' + (run.result.attached ?? 0)
+        + ' Datei(en) angehängt' + coveredNote(evidence.covered) + skippedNote(evidence.skipped)
+        + '. Kein Testlauf angelegt, kein Ergebnis geschrieben. ' + (notiz || '')
+        + ' ' + (run.result.workItemUrl || '');
       return receipt;
     }
     receipt.status = 'OK';
@@ -629,7 +833,9 @@ function announce(receipt, receiptFile) {
   if (receipt.adoId) process.stderr.write('[ado-upload] Testfall ' + receipt.adoId + ' (Quelle: ' + receipt.adoIdFrom + ')\n');
   // Said out loud as well as written, so the caller's choice is visible in the Java
   // side's studio-upload-*.log — which captures this output — and not only in the receipt.
-  process.stderr.write('[ado-upload] Angefordertes Ergebnis: ' + (receipt.outcome ?? '(keins angegeben)') + '\n');
+  process.stderr.write('[ado-upload] Angefordertes Ergebnis: ' + (receipt.outcome ?? '(keins angegeben)')
+    + (receipt.evidenceOnly ? ' — NUR BELEGE, es wird kein Ergebnis geschrieben' : '') + '\n');
+  if (receipt.laufNotiz) process.stderr.write('[ado-upload] Lauf: ' + receipt.laufNotiz + '\n');
   if (receipt.evidenceFolder) process.stderr.write('[ado-upload] Evidenz: ' + receipt.evidenceFolder + '\n');
   if (receipt.document) {
     process.stderr.write('[ado-upload] Bilddokument: ' + receipt.document.status
@@ -823,8 +1029,63 @@ async function selftest() {
   // Full path through ado-automark --dry-run: offline, no az, no network.
   const off = await upload({ 'test-case': '12345' }, { ING_ADO_UPLOAD: '0' });
   check('off short-circuits', off.status === 'AUS' && off.runId === null);
-  const failed = await upload({ 'test-case': '12345', outcome: 'failed' }, {});
-  check('failed outcome never marks Passed', failed.status === 'UEBERSPRUNGEN');
+
+  // ---- der rote Lauf: Belege ja, Ergebnis nein (#259) -------------------------------
+  //
+  // Der Ordner bekommt ein data.js mit einer fehlgeschlagenen Ausführung und ein
+  // Lauf-Protokoll mit genau dem Kopf/Fehler-Block, den die echte Engine schreibt. Der Test
+  // fragt zwei Dinge getrennt: dass die Belege reisen, und dass auf dem Weg dahin nichts
+  // steht, was ein Ergebnis setzen könnte.
+  writeFileSync(join(tmp, 'data.js'), 'var DATA=' + JSON.stringify({
+    EXECUTIONS: [{ testcaseName: 'Fall', nopassTests: '2', nofailTests: '16' }],
+  }) + ';');
+  writeFileSync(join(tmp, 'logs', 'Case.txt'),
+    'Step:1  |  Object:Browser  |  Action:Open  |  Input:Login:URL  |  Condition:  | @21-Juli-2026 01:05:54\n'
+    + '[FAIL]   | Error {\n'
+    + "  message='net::ERR_CONNECTION_REFUSED at http://localhost:3000/signin\n"
+    + "  name='Error\n}\n"
+    + 'Step:2  |  Object:Username  |  Action:Click  |  Input:  |  Condition:  | @21-Juli-2026 01:06:25\n'
+    + '[FAIL]   | Error: Error {\n'
+    + "  message='Timeout 30000ms exceeded.\n  name='TimeoutError\n}\n");
+  check('a red run is read as red out of its own report',
+    runVerdict(tmp) && runVerdict(tmp).red === true && runVerdict(tmp).failed === 16);
+  check('the FIRST red step is named, not the sixteenth',
+    /^Error am Schritt 1 \(Browser\/Open\): net::ERR_CONNECTION_REFUSED/.test(firstFailure(tmp)));
+  check('the failure extract carries no quote that would cut the comment dead',
+    firstFailure(tmp).indexOf('"') < 0);
+  check('and no stacktrace travels with it', !/\n|\tat /.test(firstFailure(tmp)));
+  const notiz = laufNotiz(tmp);
+  check('the note says ROT, names the step and says the result stayed untouched',
+    /^Automatischer Lauf ROT — Error am Schritt 1/.test(notiz)
+    && /NICHT verändert/.test(notiz));
+  check('the note carries the timestamp of the run the evidence comes from',
+    /Beleg-Lauf vom \d\d\.\d\d\.\d{4} \d\d:\d\d\./.test(notiz));
+  check('a folder without a report claims nothing about a run',
+    laufNotiz(join(tmp, 'logs')) === '' && runStamp(join(tmp, 'logs')) === null);
+
+  const failed = await upload({ 'test-case': '12345', evidence: tmp, outcome: 'failed', 'dry-run': true }, {});
+  check('a failed run is no longer refused — its evidence travels',
+    failed.status === 'PROBELAUF' && failed.attached.length > 0);
+  check('…and it goes on the evidence-only path', failed.evidenceOnly === true);
+  check('…whose comment names ROT and the first step',
+    /Automatischer Lauf ROT — Error am Schritt 1/.test(failed.comment));
+  check('…and the receipt still records WHICH outcome was asked for', failed.outcome === 'failed');
+
+  const green = await upload({ 'test-case': '12345', evidence: tmp, outcome: 'passed', 'dry-run': true }, {});
+  check('a passing run is never sent down the evidence-only path', green.evidenceOnly === false);
+  check('the comment of a run reported passed still tells the truth about the RUN',
+    /Automatischer Lauf ROT/.test(green.comment));
+
+  // Grün von A bis Z: derselbe Ordner ohne die roten Zahlen und ohne Fehlerblock.
+  writeFileSync(join(tmp, 'data.js'), 'var DATA=' + JSON.stringify({
+    EXECUTIONS: [{ testcaseName: 'Fall', nopassTests: '16', nofailTests: '0' }],
+  }) + ';');
+  writeFileSync(join(tmp, 'logs', 'Case.txt'), 'Step:1  |  Object:Browser  |  Action:Open  |  Input:  |  Condition:  | @x\n[PASS]\n');
+  check('a green run says GRÜN and carries its timestamp',
+    /^Automatischer Lauf GRÜN\. Beleg-Lauf vom \d\d\.\d\d\.\d{4} \d\d:\d\d\.$/.test(laufNotiz(tmp)));
+  const greenRun = await upload({ 'test-case': '12345', evidence: tmp, outcome: 'passed', 'dry-run': true }, {});
+  check('a green run marks as before: no evidence-only, comment says GRÜN',
+    greenRun.evidenceOnly === false && /Automatischer Lauf GRÜN/.test(greenRun.comment));
 
   // The requested outcome survives into the receipt on EVERY path, including the ones
   // that return before anything is attempted. Without this, "a failed run is never
