@@ -13,6 +13,7 @@ import com.ing.engine.execution.data.Parameter;
 import com.ing.engine.execution.exception.DriverClosedException;
 import com.ing.engine.execution.exception.UnKnownError;
 import com.ing.engine.execution.exception.data.DataNotFoundException;
+import com.ing.engine.execution.policy.ObjectDependencyPolicyViolationException;
 import com.ing.engine.execution.policy.ObjectReferenceAnalyzer;
 import com.ing.engine.execution.resolver.ExecutionResolver;
 import com.ing.engine.execution.resolver.ScopedExecutionResolver;
@@ -33,6 +34,8 @@ public class TestStepRunner {
     private final Parameter parameter;
     private Step step;
 
+    private boolean releasedByNextStep;
+
     public TestStepRunner(TestStep testStep, Parameter parameter) {
         this.parameter = parameter;
         this.testStep = testStep;
@@ -46,7 +49,7 @@ public class TestStepRunner {
     public void run(TestCaseRunner context) throws DataNotFoundException, DriverClosedException {
         if (this.parameter != null && this.testStep != null) {
             if (context.executor().isDebugExe()) {
-                checkForDebug();
+                checkForDebug(context);
             }
             step = new Step(testStep, context);
             context.getReport().updateStepDetails(step);
@@ -63,11 +66,18 @@ public class TestStepRunner {
         }
     }
 
-    private void checkForDebug() {
+    private void checkForDebug(TestCaseRunner context) {
+        releasedByNextStep = false;
+
+        if (context.isDebugSuppressedForReusableStepOver()) {
+            return;
+        }
+
         SystemDefaults.nextStepflag.set(true);
         SystemDefaults.pauseExecution.set(
             getStep().hasBreakPoint() || SystemDefaults.pauseExecution.get()
         );
+
         while (
             SystemDefaults.pauseExecution.get() &&
             SystemDefaults.nextStepflag.get() &&
@@ -75,6 +85,11 @@ public class TestStepRunner {
         ) {
             SystemDefaults.pollWait();
         }
+
+        releasedByNextStep =
+            SystemDefaults.pauseExecution.get() &&
+            !SystemDefaults.nextStepflag.get() &&
+            !SystemDefaults.stopExecution.get();
     }
 
     private int getSubIterationFromInput(TestCaseRunner context) {
@@ -152,13 +167,20 @@ public class TestStepRunner {
                 TestCase stc = scn.getTestCaseByName(testcaseName);
                 if (stc != null) {
                     stc.setParentTestCase(context.getTestCase());
-                    // Set scope metadata in context for downstream consumers
-                    context.setResolvedReusableScope(resolvedScope);
 
                     // Phase 4: Validate object references against policy before execution
                     validateObjectReferencesForPolicy(context, resolvedScope);
 
-                    executeTestCase(context, stc);
+                    // Scope is set on the new reusableRunner only (see executeTestCase) - NOT
+                    // on `context`. `context` is the CALLING runner, which may itself be the
+                    // true root (TestCaseRunner.getRoot() walks the parent chain via this same
+                    // `context` link). Mutating context's scope here - even temporarily - is
+                    // visible through getRoot() to every data lookup made by the nested
+                    // reusable while it runs, corrupting the parent identity's own scope
+                    // (e.g. a Test Plan root becoming "[Project]"-scoped) for the whole nested
+                    // call, which breaks parent-data resolution for nested/looped/multi-level
+                    // reusables.
+                    executeTestCase(context, stc, resolvedScope);
                     return;
                 } else {
                     throw new ForcedException(
@@ -189,12 +211,24 @@ public class TestStepRunner {
         );
     }
 
-    private void executeTestCase(TestCaseRunner context, TestCase stc)
+    private void executeTestCase(
+        TestCaseRunner context,
+        TestCase stc,
+        ReusableRef.Scope resolvedScope
+    )
         throws DataNotFoundException {
         try {
             parameter.setSubIteration(getSubIterationFromInput(context));
-            context.getReport().startComponent(getStep().getAction(), getStep().getDescription());
-            new TestCaseRunner(context, stc, parameter).run();
+            context
+                .getReport()
+                .startComponent(getStep().getAction(), getStep().getDescription(), resolvedScope);
+
+            // The reusable's own steps execute through this runner, so preserve both
+            // the resolved scope and the reusable step-over debug state.
+            TestCaseRunner reusableRunner = new TestCaseRunner(context, stc, parameter);
+            reusableRunner.setResolvedReusableScope(resolvedScope);
+            reusableRunner.setSuppressDebugForReusableStepOver(releasedByNextStep);
+            reusableRunner.run();
         } finally {
             context.getReport().endComponent(getStep().getAction());
         }

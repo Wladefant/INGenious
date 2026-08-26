@@ -3,6 +3,7 @@ package com.ing.engine.execution.data;
 import com.ing.datalib.component.ReusableRef;
 import com.ing.datalib.testdata.model.GlobalDataModel;
 import com.ing.datalib.testdata.model.TestDataModel;
+import com.ing.datalib.testdata.view.TestDataView;
 import com.ing.engine.execution.exception.data.DataNotFoundException;
 import com.ing.engine.execution.exception.data.DataNotFoundException.Cause;
 import com.ing.engine.execution.exception.data.TestDataNotFoundException;
@@ -63,17 +64,35 @@ public class DataAccessInternal {
         }
     }
 
-    protected static String getDataFromModel(
+    /**
+     * Get data from test data model with scope filtering.
+     * This method is used for reusable components to ensure they only access
+     * data rows that match their scope ([Project], [Shared], or empty for test plan).
+     *
+     * @param model the test data model
+     * @param field the field/column name
+     * @param scn the scenario name
+     * @param tc the testcase name
+     * @param iter the iteration number
+     * @param subIter the sub-iteration number
+     * @param scope the scope filter ([Project], [Shared], or empty)
+     * @return the field value or null if not found
+     */
+    protected static String getDataFromModelWithScope(
         TestDataModel model,
         String field,
         String scn,
         String tc,
         String iter,
-        String subIter
+        String subIter,
+        String scope
     ) {
         try {
             if (notNull(model)) {
-                return model.view().withSubIter(scn, tc, iter, subIter).getField(field);
+                return model
+                    .view()
+                    .withSubIterAndScope(scn, tc, iter, subIter, scope)
+                    .getField(field);
             }
         } catch (Exception ex) {
             LOG.log(Level.WARNING, ex.getMessage(), ex);
@@ -81,6 +100,10 @@ public class DataAccessInternal {
         return null;
     }
 
+    /**
+     * Update test data in the model with scope filtering, so a same-named scenario/testcase
+     * in another reusable scope is never matched/overwritten by mistake.
+     */
     protected static boolean putDataToModel(
         TestDataModel model,
         String field,
@@ -88,12 +111,16 @@ public class DataAccessInternal {
         String scn,
         String tc,
         String iter,
-        String subIter
+        String subIter,
+        String scope
     ) {
         try {
             if (
                 notNull(model) &&
-                model.view().withSubIter(scn, tc, iter, subIter, true).update(field, newVal)
+                model
+                    .view()
+                    .withSubIterAndScope(scn, tc, iter, subIter, scope, true)
+                    .update(field, newVal)
             ) {
                 model.saveChanges();
                 return true;
@@ -114,11 +141,12 @@ public class DataAccessInternal {
         String scn,
         String tc,
         String iter,
-        String subIter
+        String subIter,
+        String scope
     ) {
         return (
-            putDataToModel(env, field, newVal, scn, tc, iter, subIter) ||
-            putDataToModel(def, field, newVal, scn, tc, iter, subIter)
+            putDataToModel(env, field, newVal, scn, tc, iter, subIter, scope) ||
+            putDataToModel(def, field, newVal, scn, tc, iter, subIter, scope)
         );
     }
 
@@ -187,18 +215,32 @@ public class DataAccessInternal {
         TestDataModel def
     ) {
         Set<String> val = null;
+        // The root is normally the Test Plan entry (empty scope), but when a reusable is
+        // run standalone (no parent Execute step) it IS its own root, so this must honor
+        // its resolved scope too - otherwise it could match a same-named row from the
+        // other reusable scope.
+        String rootScope = getScopeFilter(context.getRoot());
+
         if (notNull(env)) {
             val =
                 env
                     .view()
-                    .withTestcase(context.getRoot().scenario(), context.getRoot().testcase())
+                    .withTestcaseAndScope(
+                        context.getRoot().scenario(),
+                        context.getRoot().testcase(),
+                        rootScope
+                    )
                     .getIterations();
         }
         if (isNullOrEmpty(val) && notNull(def)) {
             val =
                 def
                     .view()
-                    .withTestcase(context.getRoot().scenario(), context.getRoot().testcase())
+                    .withTestcaseAndScope(
+                        context.getRoot().scenario(),
+                        context.getRoot().testcase(),
+                        rootScope
+                    )
                     .getIterations();
         }
         return val;
@@ -214,11 +256,21 @@ public class DataAccessInternal {
         TestDataModel def
     ) {
         Set<String> val = null;
+        String scopeFilter = getScopeFilter(context);
+
         if (notNull(env)) {
-            val = env.view().withTestcase(context.scenario(), context.testcase()).getIterations();
+            val =
+                env
+                    .view()
+                    .withTestcaseAndScope(context.scenario(), context.testcase(), scopeFilter)
+                    .getIterations();
         }
         if (isNullOrEmpty(val) && notNull(def)) {
-            val = def.view().withTestcase(context.scenario(), context.testcase()).getIterations();
+            val =
+                def
+                    .view()
+                    .withTestcaseAndScope(context.scenario(), context.testcase(), scopeFilter)
+                    .getIterations();
         }
         return val;
     }
@@ -232,13 +284,35 @@ public class DataAccessInternal {
      */
     protected static Set<String> getIter(TestCaseRunner context, TestDataModel def) {
         if (notNull(def)) {
-            Set<String> val = def
+            // The root is normally the Test Plan entry (empty scope), but when a reusable is
+            // run standalone (no parent Execute step) it IS its own root, so this must honor
+            // its resolved scope too.
+            String rootScope = getScopeFilter(context.getRoot());
+            String scopeFilter = getScopeFilter(context);
+
+            // Get root testcase view with null-safety check
+            TestDataView rootTestcaseView = def
                 .view()
-                .withTestcase(context.getRoot().scenario(), context.getRoot().testcase())
-                .getIterations();
+                .withTestcaseAndScope(
+                    context.getRoot().scenario(),
+                    context.getRoot().testcase(),
+                    rootScope
+                );
+
+            Set<String> val = null;
+            if (notNull(rootTestcaseView)) {
+                val = rootTestcaseView.getIterations();
+            }
+
             if (isNullOrEmpty(val)) {
-                val =
-                    def.view().withTestcase(context.scenario(), context.testcase()).getIterations();
+                // Get reusable testcase view with null-safety check
+                TestDataView reusableTestcaseView = def
+                    .view()
+                    .withTestcaseAndScope(context.scenario(), context.testcase(), scopeFilter);
+
+                if (notNull(reusableTestcaseView)) {
+                    val = reusableTestcaseView.getIterations();
+                }
             }
             return val;
         }
@@ -273,14 +347,19 @@ public class DataAccessInternal {
         TestDataModel def
     ) {
         Set<String> val = null;
+        // The root is normally the Test Plan entry (empty scope), but when a reusable is
+        // run standalone (no parent Execute step) it IS its own root, so this must honor
+        // its resolved scope too.
+        String rootScope = getScopeFilter(context.getRoot());
         if (notNull(env)) {
             val =
                 env
                     .view()
-                    .withIter(
+                    .withIterAndScope(
                         context.getRoot().scenario(),
                         context.getRoot().testcase(),
-                        context.iteration()
+                        context.iteration(),
+                        rootScope
                     )
                     .getSubIterations();
         }
@@ -288,10 +367,11 @@ public class DataAccessInternal {
             val =
                 def
                     .view()
-                    .withIter(
+                    .withIterAndScope(
                         context.getRoot().scenario(),
                         context.getRoot().testcase(),
-                        context.iteration()
+                        context.iteration(),
+                        rootScope
                     )
                     .getSubIterations();
         }
@@ -304,18 +384,29 @@ public class DataAccessInternal {
         TestDataModel def
     ) {
         Set<String> val = null;
+        String scopeFilter = getScopeFilter(context);
         if (notNull(env)) {
             val =
                 env
                     .view()
-                    .withIter(context.scenario(), context.testcase(), context.iteration())
+                    .withIterAndScope(
+                        context.scenario(),
+                        context.testcase(),
+                        context.iteration(),
+                        scopeFilter
+                    )
                     .getSubIterations();
         }
         if (isNullOrEmpty(val) && notNull(def)) {
             val =
                 def
                     .view()
-                    .withIter(context.scenario(), context.testcase(), context.iteration())
+                    .withIterAndScope(
+                        context.scenario(),
+                        context.testcase(),
+                        context.iteration(),
+                        scopeFilter
+                    )
                     .getSubIterations();
         }
         return val;
@@ -331,19 +422,28 @@ public class DataAccessInternal {
      */
     protected static Set<String> getSubIter(TestCaseRunner context, TestDataModel def) {
         if (notNull(def)) {
+            // The root is normally the Test Plan entry (empty scope), but when a reusable is
+            // run standalone (no parent Execute step) it IS its own root, so this must honor
+            // its resolved scope too.
             Set<String> val = def
                 .view()
-                .withIter(
+                .withIterAndScope(
                     context.getRoot().scenario(),
                     context.getRoot().testcase(),
-                    context.iteration()
+                    context.iteration(),
+                    getScopeFilter(context.getRoot())
                 )
                 .getSubIterations();
             if (isNullOrEmpty(val)) {
                 val =
                     def
                         .view()
-                        .withIter(context.scenario(), context.testcase(), context.iteration())
+                        .withIterAndScope(
+                            context.scenario(),
+                            context.testcase(),
+                            context.iteration(),
+                            getScopeFilter(context)
+                        )
                         .getSubIterations();
             }
             return val;
@@ -505,5 +605,45 @@ public class DataAccessInternal {
     protected static String getScopeContextString(TestCaseRunner context) {
         ReusableRef.Scope scope = context.getResolvedReusableScope();
         return scope != null ? " (scope: [" + scope + "])" : "";
+    }
+
+    /**
+     * Converts the ReusableRef.Scope to a scope filter string for test data filtering.
+     *
+     * @param context the test case execution context
+     * @return scope filter string ([Project], [Shared], or empty for test plan/unscoped)
+     */
+    protected static String getScopeFilter(TestCaseRunner context) {
+        ReusableRef.Scope scope = context.getResolvedReusableScope();
+        if (scope == null) {
+            return ""; // Empty scope for test plan scenarios
+        }
+        switch (scope) {
+            case PROJECT:
+                return "[Project]";
+            case SHARED:
+                return "[Shared]";
+            case UNSCOPED:
+            default:
+                return ""; // Empty for backward compatibility
+        }
+    }
+
+    /**
+     * Resolves the scope filter to use for an explicitly-named scenario/testcase (as opposed
+     * to the ones implied by {@code context}/{@code context.getRoot()}) - e.g. a user command
+     * reading another sheet's data by name via {@code UserDataAccess}. If the given name pair
+     * matches the root or the current context, that context's own resolved scope is used;
+     * otherwise there is no scope information to go on, so it falls back to unscoped (matching
+     * prior behavior for references to some other scenario/testcase entirely).
+     */
+    protected static String getScopeFilter(TestCaseRunner context, String scn, String tc) {
+        if (scn.equals(context.getRoot().scenario()) && tc.equals(context.getRoot().testcase())) {
+            return getScopeFilter(context.getRoot());
+        }
+        if (scn.equals(context.scenario()) && tc.equals(context.testcase())) {
+            return getScopeFilter(context);
+        }
+        return "";
     }
 }
