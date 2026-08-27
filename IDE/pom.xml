@@ -278,7 +278,12 @@
 				<version>3.9.0</version>
 				<executions>
 					<execution>
-						<phase>install</phase>
+						<!-- prepare-package, nicht install: das Zippen in Dist laeuft in Phase
+						     package. Haengt dieser Schritt an install, enthaelt lib/ nach einem
+						     `mvn clean package` nur das Engine-JAR, und Studio stirbt beim Start
+						     an NoClassDefFoundError: org/apache/commons/lang3/time/StopWatch.
+						     Gemessen am 27.08.2026: 2 statt 197 Dateien in lib/. Siehe #300. -->
+						<phase>prepare-package</phase>
 						<goals>
 							<goal>copy-dependencies</goal>
 						</goals>
@@ -295,7 +300,7 @@
 				<executions>
 					<execution>
 						<id>copy-resources</id>
-						<phase>install</phase>
+						<phase>prepare-package</phase>
 						<goals>
 							<goal>copy-resources</goal>
 						</goals>
