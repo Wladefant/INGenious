@@ -47,8 +47,11 @@
                                         <include>ingenious-ide-*.jar</include>
                                         <include>Engine/lib/ingenious-datalib-*.jar</include>
                                         <include>Engine/lib/ingenious-testdata-csv-*.jar</include>
+                                        <include>lib/ingenious-datalib-*.jar</include>
+                                        <include>lib/ingenious-testdata-*.jar</include>
                                         <include>lib/ingenious-engine-*.jar</include>
                                         <include>Tools/storywriter-*.jar</include>
+                                        <include>tools/**</include>
                                     </includes>
                                 </fileset>
                             </filesets>
@@ -117,6 +120,14 @@
                                     <overWrite>true</overWrite>
                                     <outputDirectory>${setupDir}/Engine/lib</outputDirectory>
                                 </artifactItem>
+                                <artifactItem>
+                                    <groupId>com.ing</groupId>
+                                    <artifactId>ingenious-api</artifactId>
+                                    <version>${ingenious-api.version}</version>
+                                    <type>jar</type>
+                                    <overWrite>true</overWrite>
+                                    <outputDirectory>${setupDir}/lib</outputDirectory>
+                                </artifactItem>
                             </artifactItems>
                         </configuration>
                     </execution>                    
@@ -175,6 +186,27 @@
                                         <exclude>**/*.command</exclude>
                                         <exclude>**/*.txt</exclude>
                                         <exclude>**/*.md</exclude>
+                                    </excludes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>copy-qa-tools</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${setupDir}/tools</outputDirectory>
+                            <includeEmptyDirs>true</includeEmptyDirs>
+                            <resources>
+                                <resource>
+                                    <directory>../../tools</directory>
+                                    <filtering>false</filtering>
+                                    <excludes>
+                                        <exclude>remote/**</exclude>
+                                        <exclude>fixtures/**</exclude>
                                     </excludes>
                                 </resource>
                             </resources>

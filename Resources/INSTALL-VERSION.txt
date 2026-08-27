@@ -1,0 +1,8 @@
+source     : https://github.com/Wladefant/INGenious.git
+ref        : feat/studio-panel-plugins
+commit     : ff1448f57407942b3001c9a7c7c94a9c45796c55
+describe   : 4.0.0-ff1448f5
+built      : 2026-08-27
+java       : OpenJDK 17
+maven      : 3.9
+tests      : skipped
