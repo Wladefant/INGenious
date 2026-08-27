@@ -53,6 +53,26 @@
                                         <include>Tools/storywriter-*.jar</include>
                                         <include>tools/**</include>
                                     </includes>
+                                    <!--
+                                      Die laufende Version ausnehmen, sonst reisst dieser Schritt
+                                      ein Loch: lib/ingenious-datalib und lib/ingenious-testdata-csv
+                                      werden von IDE/pom.xml copy-dependencies in prepare-package
+                                      gelegt (dasselbe Phase, IDE laeuft vorher), aber Dist
+                                      copy-jar legt sie in package nur nach Engine/lib zurueck.
+                                      Geloescht und nie ersetzt startete Studio nicht mehr:
+                                      NoClassDefFoundError com/ing/datalib/testdata/TestDataFactory,
+                                      gemessen am 27.08.2026 (194 statt 196 JARs in lib/).
+                                      Alte Versionen fallen weiterhin, die aktuelle bleibt.
+                                    -->
+                                    <excludes>
+                                        <exclude>ingenious-ide-${project.parent.version}.jar</exclude>
+                                        <exclude>Engine/lib/ingenious-datalib-${project.parent.version}.jar</exclude>
+                                        <exclude>Engine/lib/ingenious-testdata-csv-${project.parent.version}.jar</exclude>
+                                        <exclude>lib/ingenious-datalib-${project.parent.version}.jar</exclude>
+                                        <exclude>lib/ingenious-testdata-csv-${project.parent.version}.jar</exclude>
+                                        <exclude>lib/ingenious-engine-${project.parent.version}.jar</exclude>
+                                        <exclude>Tools/storywriter-${project.parent.version}.jar</exclude>
+                                    </excludes>
                                 </fileset>
                             </filesets>
                         </configuration>
