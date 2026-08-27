@@ -104,6 +104,58 @@ import javax.swing.table.TableCellRenderer;
  * and provides a unified environment for building and running automated
  * test cases.
  * </p>
+ *
+ * <h2>Aufnahme-Lebenszyklus — #293</h2>
+ *
+ * <p>
+ * Heute endet eine Aufnahme so: {@link #record()} ist ein Umschalter. Läuft
+ * bereits eine Aufnahme, ruft die erste Verzweigung
+ * {@code stopPlaywrightRecording()} auf. Die beendete bis #293 den
+ * Codegen-Prozess <em>und den ganzen Nachkommenbaum</em> mit
+ * {@code destroyForcibly()} — inklusive „Google Chrome for Testing".
+ * {@code finalizeLiveRecording()} speichert die YAML-Schritte
+ * ({@code liveRecordingTarget.save()}) und setzt
+ * {@code toolBar.setRecordingState(false)}. Der Browser ist weg.
+ * </p>
+ *
+ * <p>
+ * Die Sitzung überlebt das heute nur, wenn
+ * {@code Settings/BrowserContexts/default.properties} bereits
+ * {@code useStorageState=true} und einen existierenden
+ * {@code storageStatePath} trägt: {@link #storageStateArgs(String)} hängt dann
+ * {@code --load-storage} an den nächsten Codegen-Start. Geschrieben wird diese
+ * Datei von der Aufnahme selbst <em>nicht</em>. Playwright 1.54.1
+ * ({@code npx playwright codegen --help}, gemessen 2026-08-27) kann
+ * {@code --save-storage} — und schreibt den Speicherzustand erst beim
+ * <em>normalen</em> Ende des CLI-Prozesses. {@code destroyForcibly()} überspringt
+ * genau das. Deshalb muss der Tester nach jedem Testfall neu anmelden: der
+ * nächste Codegen startet ohne gespeicherte Cookies.
+ * </p>
+ *
+ * <p>
+ * <b>Warum nicht ein Browser über zwei Testfälle?</b> Codegen ist ein eigener
+ * OS-Prozess ({@code java -cp "lib/*;." com.microsoft.playwright.CLI codegen
+ * …}). Studio hängt an seinem stdout ({@link #runPlaywrightProcess}); das
+ * CLI hat keinen Schalter „Ausgabe-Datei wechseln, Browser offen lassen".
+ * Einen zweiten Codegen gegen denselben Browser zu hängen ginge nur über
+ * {@code --user-data-dir} — und der belegt das Profil exklusiv, solange der
+ * erste Prozess lebt. Gemessen (Playwright-Bibliothek, Chromium headless,
+ * 2026-08-27): ein Kontext mit vorhandenem Speicherzustand startet in
+ * {@code 312 ms} und trägt {@code localStorage.signedIn=yes} weiter; ein
+ * frischer Kontext braucht {@code 1240 ms} und ist leer. Speichern selbst
+ * kostet {@code 6 ms}. Die Sitzung wiederzuverwenden, indem sie auf die
+ * Platte geschrieben und beim nächsten Start geladen wird, ist deshalb das
+ * Nächste, das der CLI hergibt — und entfernt die Neu-Anmeldung.
+ * </p>
+ *
+ * <p>
+ * Ablauf nach #293: Aufnahme endet → YAML wird gespeichert → Codegen bekommt
+ * ein sanftes {@code destroy()} und höchstens zwei Sekunden, damit
+ * {@code --save-storage} den Speicherzustand schreiben kann → erst dann fällt
+ * der Prozessbaum. Der nächste Testfall startet denselben Browser-Typ, aber
+ * bereits angemeldet, weil {@code --load-storage} dieselbe Datei liest. Das
+ * Fenster ist ein neues Fenster; die Sitzung ist dieselbe.
+ * </p>
  */
 public class TestCaseComponent extends JPanel implements ActionListener {
     private static final String PLAYWRIGHT_INSTALL_HINT =
@@ -1002,7 +1054,8 @@ public class TestCaseComponent extends JPanel implements ActionListener {
             .replace("\\", "\\\\")
             .replace("\"", "\\\"");
         String processArgs = "codegen --target java --output \"" + escapedPath + "\"";
-        String storageStateArgs = storageStateArgs(sMainFrame.getProject().getLocation());
+        String projectLocation = sMainFrame.getProject().getLocation();
+        String storageStateArgs = storageStateArgs(projectLocation);
         // Said out loud on every launch: a recorder that silently did or did not carry the
         // sign-in over is the exact ambiguity this setting exists to remove.
         logPlaywright(
@@ -1010,7 +1063,10 @@ public class TestCaseComponent extends JPanel implements ActionListener {
                 ? "No saved browser session configured. The recorder starts signed out."
                 : "Saved browser session reused:" + storageStateArgs
         );
-        // Before the start URL: that one is positional, everything after it is no longer an option.
+        // --save-storage first so a later --load-storage of the same file is still an
+        // option, and both sit before the positional start URL. Playwright writes the
+        // file only when the CLI process ends normally — see stopPlaywrightRecording.
+        processArgs += saveStorageArgs(projectLocation);
         processArgs += storageStateArgs;
         if (startUrl != null) {
             // Quoted: the command is handed to cmd/bash as one string, and an unquoted query
@@ -1042,7 +1098,9 @@ public class TestCaseComponent extends JPanel implements ActionListener {
      *
      * @param projectLocation location of the open project
      * @return {@code --load-storage "<path>"} including its leading space, or {@code ""} when the
-     *         project has no usable saved session
+     *         project has no usable saved session to <em>load</em>. A missing file is not a
+     *         reason to skip {@code --save-storage}: the first recording of a session has to
+     *         create that file, or the second one cannot load it.
      */
     static String storageStateArgs(String projectLocation) {
         if (projectLocation == null) {
@@ -1064,10 +1122,15 @@ public class TestCaseComponent extends JPanel implements ActionListener {
                 return "";
             }
             String storageStatePath = contextDetails.getProperty("storageStatePath", "").trim();
+            if (storageStatePath.isEmpty()) {
+                return "";
+            }
             // Codegen aborts on a state file it cannot open, which would mean no recorder at all;
             // landing on the login page is the better of the two failures. The engine skips a
             // missing file for the same reason, so both stay silent about it in the same way.
-            if (storageStatePath.isEmpty() || !new File(storageStatePath).exists()) {
+            // --save-storage is still passed (see saveStorageArgs) so the first recording can
+            // create the file the next one loads.
+            if (!new File(storageStatePath).exists()) {
                 return "";
             }
             // Escaped like --output above: this ends up inside double quotes in a single command
@@ -1082,6 +1145,73 @@ public class TestCaseComponent extends JPanel implements ActionListener {
             System.err.println(
                 "Could not read " + contextFile + ", recording without a saved session: " + ex
             );
+            return "";
+        }
+    }
+
+    /**
+     * The codegen option that writes the signed-in session when the recorder ends.
+     *
+     * <p>
+     * Complementary to {@link #storageStateArgs}: that one loads what is already there, this
+     * one writes what the tester just signed in as. Same two keys, same file, read fresh
+     * every launch. {@code useStorageState=false} is a deliberate "do not carry this" and
+     * wins — a leftover {@code --save-storage} would quietly undo the checkbox.
+     * </p>
+     *
+     * <p>
+     * A missing file is not a reason to skip the flag. Playwright creates it on a normal
+     * CLI exit; that is how the first recording of a morning produces the session the
+     * second one reuses. An empty {@code storageStatePath} is.
+     * </p>
+     *
+     * @param projectLocation location of the open project
+     * @return {@code --save-storage "<path>"} including its leading space, or {@code ""}
+     */
+    static String saveStorageArgs(String projectLocation) {
+        String path = storageStatePath(projectLocation, false);
+        if (path.isEmpty()) {
+            return "";
+        }
+        return (" --save-storage \"" + path.replace("\\", "\\\\").replace("\"", "\\\"") + "\"");
+    }
+
+    /**
+     * The project's configured storage-state file, or {@code ""} when the setting is off
+     * or unusable.
+     *
+     * @param projectLocation location of the open project
+     * @param mustExist {@code true} when the file has to be there already (load); {@code false}
+     *        when codegen is allowed to create it (save)
+     */
+    static String storageStatePath(String projectLocation, boolean mustExist) {
+        if (projectLocation == null) {
+            return "";
+        }
+        File contextFile = new File(
+            projectLocation +
+            File.separator +
+            "Settings" +
+            File.separator +
+            "BrowserContexts" +
+            File.separator +
+            "default.properties"
+        );
+        try (InputStream contextStream = new FileInputStream(contextFile)) {
+            Properties contextDetails = new Properties();
+            contextDetails.load(contextStream);
+            if (!Boolean.parseBoolean(contextDetails.getProperty("useStorageState"))) {
+                return "";
+            }
+            String storageStatePath = contextDetails.getProperty("storageStatePath", "").trim();
+            if (storageStatePath.isEmpty()) {
+                return "";
+            }
+            if (mustExist && !new File(storageStatePath).exists()) {
+                return "";
+            }
+            return storageStatePath;
+        } catch (IOException | RuntimeException ex) {
             return "";
         }
     }
@@ -1160,18 +1290,71 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         stopRequested = true;
         Process process = activePlaywrightProcess;
         if (process != null && process.isAlive()) {
-            destroyProcessTree(process);
+            // Soft first: --save-storage only writes on a normal CLI exit.
+            // destroyForcibly() used to skip that, which is why the next test case
+            // always opened signed out. Two seconds is enough for a storage-state
+            // write (measured 6 ms in-process) and short enough that a hung codegen
+            // does not pin the toolbar.
+            endPlaywrightProcess(process, 2_000);
         }
         finalizeLiveRecording();
     }
 
     /**
-     * Forcibly terminates the Playwright process and all of its descendants. The codegen CLI
-     * spawns the "Google Chrome for Testing" browser as a child process, so destroying only the
-     * parent wrapper would leave that browser window open. Collecting descendants before
-     * destroying the parent ensures the browser window is closed too.
+     * Ends the Playwright process tree, preferring a normal exit so {@code --save-storage}
+     * can write the signed-in session.
+     *
+     * <p>The codegen CLI spawns "Google Chrome for Testing" as a child. Destroying only
+     * the parent used to leave that window open — that is why the old path collected
+     * descendants and killed them all. The same collection still happens, but only after
+     * {@code destroy()} has had {@code waitMillis} to let the CLI flush. A process that
+     * is still alive then is treated as hung and force-killed, same as before.
      */
-    private void destroyProcessTree(Process process) {
+    static boolean endPlaywrightProcess(Process process, long waitMillis) {
+        if (process == null) {
+            return false;
+        }
+        if (!process.isAlive()) {
+            return true;
+        }
+        try {
+            List<ProcessHandle> descendants = process
+                .descendants()
+                .collect(java.util.stream.Collectors.toList());
+            process.destroy();
+            boolean exited = process.waitFor(
+                waitMillis,
+                java.util.concurrent.TimeUnit.MILLISECONDS
+            );
+            if (exited) {
+                return true;
+            }
+            process.destroyForcibly();
+            for (ProcessHandle handle : descendants) {
+                if (handle.isAlive()) {
+                    handle.destroyForcibly();
+                }
+            }
+            process.waitFor(500, java.util.concurrent.TimeUnit.MILLISECONDS);
+            return !process.isAlive();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            destroyProcessTree(process);
+            return false;
+        } catch (Exception ex) {
+            Logger
+                .getLogger(TestCaseComponent.class.getName())
+                .log(Level.WARNING, "Unable to terminate Playwright browser process tree", ex);
+            return false;
+        }
+    }
+
+    /**
+     * Forcibly terminates the Playwright process and all of its descendants. Kept as the
+     * last resort when a soft stop is interrupted: a leftover Chrome window is worse than
+     * losing one storage-state write.
+     */
+    static void destroyProcessTree(Process process) {
         if (process == null) {
             return;
         }
