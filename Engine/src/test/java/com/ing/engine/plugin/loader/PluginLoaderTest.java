@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import com.ing.engine.support.reflect.Discovery;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -378,6 +379,38 @@ public class PluginLoaderTest {
             System.identityHashCode(after.get(0).getClassLoader()) +
             " and closed loader " +
             System.identityHashCode(previousClassLoader),
+            true
+        );
+    }
+
+    @Test
+    public void fingerprintSeparatorIsAnEscapeNotARawNulInSource() throws Exception {
+        Path source = Path.of("src/main/java/com/ing/engine/plugin/loader/PluginLoader.java");
+        byte[] bytes = Files.readAllBytes(source);
+        for (byte value : bytes) {
+            assertThat(value)
+                .as("PluginLoader.java must not contain a raw NUL; the separator is '\\0'")
+                .isNotEqualTo((byte) 0);
+        }
+        assertThat(new String(bytes, StandardCharsets.UTF_8))
+            .as("the source spells the separator as an escape")
+            .contains(".append('\\0')");
+
+        Path pluginDirectory = temporaryDirectory.resolve("plugins");
+        Path jar = createPlugin(pluginDirectory, "sample", "sample.plugin", "1.0.0");
+        Method fingerprint = PluginLoader.class.getDeclaredMethod("fingerprint", List.class);
+        fingerprint.setAccessible(true);
+        String value = (String) fingerprint.invoke(null, List.of(jar.toFile()));
+
+        assertThat(value)
+            .as("the bytes the fingerprint produces are still NUL-separated")
+            .contains("\0")
+            .doesNotContain("\\0");
+        assertThat(value.indexOf('\0')).isGreaterThan(0);
+
+        Reporter.log(
+            "fingerprintSeparatorIsAnEscapeNotARawNulInSource EVIDENCE: source has no NUL bytes; runtime fingerprint still contains a NUL separator at index " +
+            value.indexOf('\0'),
             true
         );
     }
