@@ -12,6 +12,51 @@
         <finalName>${project.parent.artifactId}-${project.parent.version}</finalName>
         <plugins>           
             <plugin>
+                <artifactId>maven-clean-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>clean-setupDir</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                        <configuration>
+                            <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                            <filesets>
+                                <fileset>
+                                    <directory>${setupDir}</directory>
+                                    <followSymlinks>false</followSymlinks>
+                                </fileset>
+                            </filesets>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>purge-stale-setupDir</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                        <configuration>
+                            <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                            <filesets>
+                                <fileset>
+                                    <directory>${setupDir}</directory>
+                                    <followSymlinks>false</followSymlinks>
+                                    <includes>
+                                        <include>ingenious-ide-*.jar</include>
+                                        <include>Engine/lib/ingenious-datalib-*.jar</include>
+                                        <include>Engine/lib/ingenious-testdata-csv-*.jar</include>
+                                        <include>lib/ingenious-engine-*.jar</include>
+                                        <include>Tools/storywriter-*.jar</include>
+                                    </includes>
+                                </fileset>
+                            </filesets>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
 				<version>3.9.0</version>
@@ -102,7 +147,9 @@
                 <executions>
                     <execution>
                         <id>copy-resources</id>
-                        <phase>install</phase>
+                        <!-- Was install: assembly runs in package, so a fresh clone's
+                             mvn clean package packed an empty Dist/release (issue #300). -->
+                        <phase>prepare-package</phase>
                         <goals>
                             <goal>copy-resources</goal>
                         </goals>
@@ -156,7 +203,7 @@
                         <executions>
                             <execution>
                                 <id>set-executable-permission</id>
-                                <phase>install</phase>
+                                <phase>prepare-package</phase>
                                 <goals>
                                     <goal>run</goal>
                                 </goals>
