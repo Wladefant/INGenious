@@ -39,11 +39,14 @@ import com.ing.ingenious.api.contract.ui.RecordingTarget;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Cursor;
+import java.awt.Dimension;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.awt.HeadlessException;
 import java.awt.KeyEventPostProcessor;
 import java.awt.KeyboardFocusManager;
 import java.awt.Rectangle;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -56,11 +59,13 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
@@ -810,7 +815,22 @@ public class TestCaseComponent extends JPanel implements ActionListener {
 
         liveRecordingOutputFile = prepareLiveRecordingOutputFile();
         final String startUrl = resolveRecordingStartUrl(pluginTarget);
-
+        final String projectLocation = testDesign != null && testDesign.getProject() != null
+            ? testDesign.getProject().getLocation()
+            : null;
+        final String resolvedBrowser = resolveRecordingBrowser(projectLocation);
+        if (!isBrowserInstalled(resolvedBrowser)) {
+            String missingMsg = missingBrowserMessage(resolvedBrowser);
+            logPlaywrightError(missingMsg);
+            JOptionPane.showMessageDialog(
+                this,
+                missingMsg,
+                "Browser nicht gefunden",
+                JOptionPane.WARNING_MESSAGE
+            );
+            SwingUtilities.invokeLater(() -> toolBar.enableRecordButton());
+            return;
+        }
         toolBar.setConsoleVisible(true);
         consoleDialog.clear();
         consoleDialog.showConsole();
@@ -1055,6 +1075,11 @@ public class TestCaseComponent extends JPanel implements ActionListener {
             .replace("\"", "\\\"");
         String processArgs = "codegen --target java --output \"" + escapedPath + "\"";
         String projectLocation = sMainFrame.getProject().getLocation();
+
+        String browser = resolveRecordingBrowser(projectLocation);
+        String channelArgs = browserChannelArgs(browser);
+        String viewportArgs = viewportArgs();
+
         String storageStateArgs = storageStateArgs(projectLocation);
         // Said out loud on every launch: a recorder that silently did or did not carry the
         // sign-in over is the exact ambiguity this setting exists to remove.
@@ -1063,9 +1088,15 @@ public class TestCaseComponent extends JPanel implements ActionListener {
                 ? "No saved browser session configured. The recorder starts signed out."
                 : "Saved browser session reused:" + storageStateArgs
         );
-        // --save-storage first so a later --load-storage of the same file is still an
-        // option, and both sit before the positional start URL. Playwright writes the
-        // file only when the CLI process ends normally — see stopPlaywrightRecording.
+        logPlaywright(
+            channelArgs.isEmpty()
+                ? "Recorder browser: bundled Chromium (default)"
+                : "Recorder browser channel:" + channelArgs
+        );
+        logPlaywright("Recorder viewport:" + viewportArgs);
+
+        processArgs += channelArgs;
+        processArgs += viewportArgs;
         processArgs += saveStorageArgs(projectLocation);
         processArgs += storageStateArgs;
         if (startUrl != null) {
@@ -1214,6 +1245,338 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         } catch (IOException | RuntimeException ex) {
             return "";
         }
+    }
+
+    /**
+     * Resolves which browser or channel the recorder should launch:
+     * 1. Environment variable {@code ING_AUFNAHME_BROWSER}
+     * 2. Project setting {@code RecorderSettings.getBrowser()}
+     * 3. Saved per-project browser choice in {@code %LOCALAPPDATA%\IngQaAutopilot\browser-wahl.json}
+     * 4. Empty string (bundled Chromium default)
+     *
+     * @param projectLocation location of the open project
+     * @return the browser name or channel, or {@code ""} for default bundled Chromium
+     */
+    String resolveRecordingBrowser(String projectLocation) {
+        String env = System.getenv("ING_AUFNAHME_BROWSER");
+        if (env != null && !env.isBlank()) {
+            return env.trim();
+        }
+        String fromProject = "";
+        try {
+            if (
+                testDesign != null &&
+                testDesign.getProject() != null &&
+                testDesign.getProject().getProjectSettings() != null
+            ) {
+                fromProject =
+                    testDesign.getProject().getProjectSettings().getRecorderSettings().getBrowser();
+            }
+        } catch (RuntimeException ex) {
+            Logger
+                .getLogger(TestCaseComponent.class.getName())
+                .log(Level.WARNING, "Unable to read the project's recorder browser setting", ex);
+        }
+        if (fromProject != null && !fromProject.isBlank()) {
+            return fromProject.trim();
+        }
+        String fromState = readRememberedBrowser(projectLocation);
+        if (fromState != null && !fromState.isBlank()) {
+            return fromState.trim();
+        }
+        return "";
+    }
+
+    /**
+     * Assembles the {@code --channel <name>} argument for the given browser choice.
+     *
+     * @param browser the configured browser (e.g. "chrome", "msedge", "chromium", or "")
+     * @return {@code " --channel <name>"} or {@code ""} for bundled Chromium
+     */
+    public static String browserChannelArgs(String browser) {
+        if (browser == null || browser.isBlank()) {
+            return "";
+        }
+        String b = browser.trim().toLowerCase(Locale.ROOT);
+        if ("chromium".equals(b) || "bundled".equals(b) || "default".equals(b)) {
+            return "";
+        }
+        if ("chrome".equals(b) || "google-chrome".equals(b) || "google chrome".equals(b)) {
+            return " --channel chrome";
+        }
+        if (
+            "msedge".equals(b) ||
+            "edge".equals(b) ||
+            "microsoft-edge".equals(b) ||
+            "microsoft edge".equals(b)
+        ) {
+            return " --channel msedge";
+        }
+        return " --channel " + browser.trim();
+    }
+
+    /**
+     * Derives the recorder viewport size from the actual screen size so that wide applications
+     * are not constrained to the default 1280x720 window box (#312).
+     *
+     * @return {@code " --viewport-size \"<width>, <height>\""}
+     */
+    public static String viewportArgs() {
+        try {
+            if (!GraphicsEnvironment.isHeadless()) {
+                Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+                int width = (int) screenSize.getWidth();
+                int height = (int) screenSize.getHeight();
+                if (width > 0 && height > 0) {
+                    return " --viewport-size \"" + width + ", " + height + "\"";
+                }
+            }
+        } catch (RuntimeException ex) {
+            // Headless fallback
+        }
+        return " --viewport-size \"1920, 1080\"";
+    }
+
+    /**
+     * Checks whether the chosen browser is installed on this system before launching Playwright.
+     *
+     * @param browser the browser name or channel (empty = bundled Chromium)
+     * @return {@code true} if the browser executable is available, {@code false} otherwise
+     */
+    static boolean isBrowserInstalled(String browser) {
+        if (browser == null || browser.isBlank()) {
+            return true;
+        }
+        String b = browser.trim().toLowerCase(Locale.ROOT);
+        if ("chromium".equals(b) || "bundled".equals(b) || "default".equals(b)) {
+            return true;
+        }
+        if ("chrome".equals(b) || "google-chrome".equals(b) || "google chrome".equals(b)) {
+            return isChromeInstalled();
+        }
+        if (
+            "msedge".equals(b) ||
+            "edge".equals(b) ||
+            "microsoft-edge".equals(b) ||
+            "microsoft edge".equals(b)
+        ) {
+            return isEdgeInstalled();
+        }
+        return isExecutableAvailable(browser);
+    }
+
+    static boolean isChromeInstalled() {
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        if (os.contains("win")) {
+            String pf = System.getenv("ProgramFiles");
+            String pfx86 = System.getenv("ProgramFiles(x86)");
+            String local = System.getenv("LocalAppData");
+            String[] candidates = {
+                (pf != null ? pf : "C:\\Program Files") +
+                "\\Google\\Chrome\\Application\\chrome.exe",
+                (pfx86 != null ? pfx86 : "C:\\Program Files (x86)") +
+                "\\Google\\Chrome\\Application\\chrome.exe",
+                (local != null ? local : "") + "\\Google\\Chrome\\Application\\chrome.exe"
+            };
+            for (String p : candidates) {
+                if (!p.isEmpty() && new File(p).isFile()) {
+                    return true;
+                }
+            }
+            return isExecutableOnPath("chrome.exe");
+        } else if (os.contains("mac")) {
+            return (
+                new File("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").isFile() ||
+                isExecutableOnPath("google-chrome")
+            );
+        } else {
+            String[] paths = {
+                "/opt/google/chrome/chrome",
+                "/usr/bin/google-chrome",
+                "/usr/bin/google-chrome-stable",
+                "/usr/bin/chromium",
+                "/usr/bin/chromium-browser"
+            };
+            for (String p : paths) {
+                if (new File(p).isFile()) {
+                    return true;
+                }
+            }
+            return (
+                isExecutableOnPath("google-chrome") ||
+                isExecutableOnPath("google-chrome-stable") ||
+                isExecutableOnPath("chromium")
+            );
+        }
+    }
+
+    static boolean isEdgeInstalled() {
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        if (os.contains("win")) {
+            String pf = System.getenv("ProgramFiles");
+            String pfx86 = System.getenv("ProgramFiles(x86)");
+            String local = System.getenv("LocalAppData");
+            String[] candidates = {
+                (pfx86 != null ? pfx86 : "C:\\Program Files (x86)") +
+                "\\Microsoft\\Edge\\Application\\msedge.exe",
+                (pf != null ? pf : "C:\\Program Files") +
+                "\\Microsoft\\Edge\\Application\\msedge.exe",
+                (local != null ? local : "") + "\\Microsoft\\Edge\\Application\\msedge.exe"
+            };
+            for (String p : candidates) {
+                if (!p.isEmpty() && new File(p).isFile()) {
+                    return true;
+                }
+            }
+            return isExecutableOnPath("msedge.exe");
+        } else if (os.contains("mac")) {
+            return (
+                new File("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge")
+                .isFile() ||
+                isExecutableOnPath("microsoft-edge")
+            );
+        } else {
+            String[] paths = {
+                "/opt/microsoft/msedge/msedge",
+                "/usr/bin/microsoft-edge",
+                "/usr/bin/microsoft-edge-stable",
+                "/usr/bin/microsoft-edge-dev"
+            };
+            for (String p : paths) {
+                if (new File(p).isFile()) {
+                    return true;
+                }
+            }
+            return (
+                isExecutableOnPath("microsoft-edge") || isExecutableOnPath("microsoft-edge-stable")
+            );
+        }
+    }
+
+    private static boolean isExecutableOnPath(String executable) {
+        String pathEnv = System.getenv("PATH");
+        if (pathEnv == null || pathEnv.isBlank()) {
+            return false;
+        }
+        String[] dirs = pathEnv.split(File.pathSeparator);
+        for (String dir : dirs) {
+            File f = new File(dir, executable);
+            if (f.isFile() && f.canExecute()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isExecutableAvailable(String nameOrPath) {
+        if (new File(nameOrPath).isFile()) {
+            return true;
+        }
+        return isExecutableOnPath(nameOrPath) || isExecutableOnPath(nameOrPath + ".exe");
+    }
+
+    static String browserDisplayName(String browser) {
+        if (browser == null || browser.isBlank()) {
+            return "Chromium";
+        }
+        String b = browser.trim().toLowerCase(Locale.ROOT);
+        if ("chrome".equals(b) || "google-chrome".equals(b) || "google chrome".equals(b)) {
+            return "Google Chrome";
+        }
+        if (
+            "msedge".equals(b) ||
+            "edge".equals(b) ||
+            "microsoft-edge".equals(b) ||
+            "microsoft edge".equals(b)
+        ) {
+            return "Microsoft Edge";
+        }
+        if ("chromium".equals(b) || "bundled".equals(b) || "default".equals(b)) {
+            return "Chromium";
+        }
+        return browser.trim();
+    }
+
+    static String missingBrowserMessage(String browser) {
+        String name = browserDisplayName(browser);
+        return (
+            "Der Browser \"" +
+            name +
+            "\" konnte auf diesem Rechner nicht gefunden werden. " +
+            "Bitte " +
+            name +
+            " installieren oder einen anderen Browser auswählen."
+        );
+    }
+
+    static String readRememberedBrowser(String projectLocation) {
+        String local = System.getenv("LOCALAPPDATA");
+        Path file;
+        String envFile = System.getenv("ING_QA_BROWSER_DATEI");
+        if (envFile != null && !envFile.isBlank()) {
+            file = Path.of(envFile.trim());
+        } else if (local != null && !local.isBlank()) {
+            file = Path.of(local.trim(), "IngQaAutopilot", "browser-wahl.json");
+        } else {
+            file =
+                Path.of(
+                    System.getProperty("user.home", "."),
+                    ".IngQaAutopilot",
+                    "browser-wahl.json"
+                );
+        }
+        if (!Files.isRegularFile(file)) {
+            return "";
+        }
+        try {
+            String content = Files.readString(file, StandardCharsets.UTF_8).trim();
+            if (content.startsWith("{")) {
+                String key = projectLocation == null
+                    ? ""
+                    : projectLocation.trim().replace("\\", "/");
+                return extractBrowserFromJson(content, key);
+            }
+        } catch (IOException | RuntimeException ex) {
+            // ignore
+        }
+        return "";
+    }
+
+    private static String extractBrowserFromJson(String json, String projectKey) {
+        try {
+            if (projectKey != null && !projectKey.isEmpty()) {
+                String search = "\"" + projectKey.replace("\"", "\\\"") + "\"";
+                int idx = json.indexOf(search);
+                if (idx >= 0) {
+                    int colon = json.indexOf(':', idx + search.length());
+                    if (colon >= 0) {
+                        int valStart = json.indexOf('"', colon);
+                        if (valStart >= 0) {
+                            int valEnd = json.indexOf('"', valStart + 1);
+                            if (valEnd > valStart) {
+                                return json.substring(valStart + 1, valEnd);
+                            }
+                        }
+                    }
+                }
+            }
+            int defIdx = json.indexOf("\"default\"");
+            if (defIdx >= 0) {
+                int colon = json.indexOf(':', defIdx + 9);
+                if (colon >= 0) {
+                    int valStart = json.indexOf('"', colon);
+                    if (valStart >= 0) {
+                        int valEnd = json.indexOf('"', valStart + 1);
+                        if (valEnd > valStart) {
+                            return json.substring(valStart + 1, valEnd);
+                        }
+                    }
+                }
+            }
+        } catch (RuntimeException ex) {
+            // ignore
+        }
+        return "";
     }
 
     private Process runPlaywrightProcess(String processArgs) throws IOException {

@@ -12,6 +12,7 @@ package com.ing.datalib.settings;
  */
 public class RecorderSettings extends AbstractPropSettings {
     private static final String START_URL = "StartUrl";
+    private static final String BROWSER = "Browser";
 
     public RecorderSettings(String location) {
         super(location, "RecorderSettings");
@@ -33,5 +34,24 @@ public class RecorderSettings extends AbstractPropSettings {
      */
     public void setStartUrl(String value) {
         setProperty(START_URL, value == null ? "" : value.trim());
+    }
+
+    /**
+     * The browser or channel the recorder uses (e.g. {@code "chrome"}, {@code "msedge"}, or
+     * {@code ""} for Playwright's bundled Chromium).
+     *
+     * @return the browser name or channel, or an empty string when using the default bundled Chromium
+     */
+    public String getBrowser() {
+        return getProperty(BROWSER, "").trim();
+    }
+
+    /**
+     * Sets the browser or channel the recorder uses.
+     *
+     * @param value the browser or channel; {@code null} or blank clears it to default bundled Chromium
+     */
+    public void setBrowser(String value) {
+        setProperty(BROWSER, value == null ? "" : value.trim());
     }
 }
