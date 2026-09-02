@@ -63,6 +63,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
@@ -165,6 +166,21 @@ import javax.swing.table.TableCellRenderer;
 public class TestCaseComponent extends JPanel implements ActionListener {
     private static final String PLAYWRIGHT_INSTALL_HINT =
         "mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args=\"install\"";
+
+    /** Anfang bei der hinterlegten Start-Adresse — die Vorgabe. */
+    static final String DAUERBROWSER_STARTADRESSE = "startadresse";
+
+    /** Anfang dort, wo der offen gehaltene Browser gerade steht. */
+    static final String DAUERBROWSER_WEITER = "weiter";
+
+    /**
+     * Exit-Code des Dauerbrowsers, wenn sein Startschutz angeschlagen hat.
+     *
+     * <p>Er benutzt interne Playwright-APIs und ist an eine gemessene Version gepinnt. Ist eine
+     * dieser Stellen umgezogen, endet er mit genau diesem Code, nachdem er einen deutschen
+     * Erklärsatz ausgegeben hat — und die Aufnahme läuft hier wie bisher über codegen weiter.
+     */
+    static final int DAUERBROWSER_STARTSCHUTZ = 3;
 
     private final TestDesign testDesign;
 
@@ -1064,11 +1080,34 @@ public class TestCaseComponent extends JPanel implements ActionListener {
     /**
      * Starts the Playwright recorder, optionally on a given page.
      *
-     * @param outputFile file codegen writes the recorded script to
-     * @param startUrl page to open, or {@code null} for codegen's blank page
-     * @throws IOException when the recorder process cannot be started
+     * <p><b>Zwei Wege, und der zweite ist kein Notbehelf.</b> Bevorzugt läuft die Aufnahme im
+     * Dauerbrowser ({@code tools/aufnahme-dauerbrowser.mjs}): ein Browser, der über den
+     * Testfallwechsel hinweg offen bleibt, damit ein sieben Klicks tiefer Zustand nicht für
+     * jeden Fall neu aufgebaut werden muss. Der Dauerbrowser benutzt interne Playwright-APIs
+     * und ist an eine gemessene Version gepinnt; sein Startschutz meldet mit Exit-Code 3, wenn
+     * eine dieser Stellen fehlt oder umgezogen ist.
+     *
+     * <p>Genau dann — und ebenso, wenn kein Node oder kein Werkzeugordner da ist — läuft die
+     * Aufnahme wie bisher über {@code codegen}, mit einem eigenen Fenster pro Testfall. Eine
+     * Testerin darf nie aufnahmeunfähig sein, weil eine interne Schnittstelle umgezogen ist;
+     * der Grund steht dann in einem deutschen Satz in der Konsole, nicht in einem Stacktrace.
+     *
+     * @param outputFile file the recorder writes the recorded Java script to
+     * @param startUrl page to open, or {@code null} for a blank page
+     * @throws IOException when neither recorder can be started
      */
     public void launchPlaywright(File outputFile, String startUrl) throws IOException {
+        if (launchDauerbrowser(outputFile, startUrl)) {
+            logPlaywright(
+                "============================== Playwright Log Ended =============================="
+            );
+            return;
+        }
+        launchCodegen(outputFile, startUrl);
+    }
+
+    /** Der bisherige Weg: ein {@code codegen}-Fenster pro Testfall. Der Rückfall. */
+    private void launchCodegen(File outputFile, String startUrl) throws IOException {
         String escapedPath = outputFile
             .getAbsolutePath()
             .replace("\\", "\\\\")
@@ -1109,6 +1148,232 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         logPlaywright(
             "============================== Playwright Log Ended =============================="
         );
+    }
+
+    /**
+     * Nimmt im Dauerbrowser auf — ein Browser, der über den Testfallwechsel hinweg offen bleibt.
+     *
+     * <p>Der Client-Prozess bleibt für die Dauer der Aufnahme am Leben und hält eine offene
+     * Verbindung zum Daemon; {@link #stopPlaywrightRecording()} beendet ihn wie bisher, und die
+     * geschlossene Verbindung ist für den Daemon das Signal, den Belegsatz zu schreiben. Der
+     * Daemon selbst ist bewusst KEIN Nachkomme dieses Prozesses (er wird über einen sofort
+     * endenden Zwischenschritt gestartet), sonst risse ihn {@link #endPlaywrightProcess} mit —
+     * genau das nimmt es dem Browser, offen zu bleiben.
+     *
+     * @return {@code true}, wenn die Aufnahme im Dauerbrowser gelaufen ist; {@code false},
+     *     wenn stattdessen auf {@code codegen} zurückgefallen werden muss
+     */
+    private boolean launchDauerbrowser(File outputFile, String startUrl) {
+        File werkzeug = findeDauerbrowserWerkzeug();
+        if (werkzeug == null) {
+            logPlaywright(
+                "Dauerbrowser nicht gefunden (tools/aufnahme-dauerbrowser.mjs) — " +
+                "diese Aufnahme öffnet wie bisher ihr eigenes Fenster."
+            );
+            return false;
+        }
+        String projectLocation = sMainFrame.getProject().getLocation();
+        String modus = resolveRecordingStartModus(projectLocation);
+        File belege = belegOrdnerFuerAufnahme(outputFile);
+
+        List<String> command = new ArrayList<>();
+        command.add("node");
+        command.add(werkzeug.getAbsolutePath());
+        command.add("--aufnehmen");
+        command.add("--ausgabe");
+        command.add(outputFile.getAbsolutePath());
+        command.add("--belege");
+        command.add(belege.getAbsolutePath());
+        command.add("--modus");
+        command.add(modus);
+        command.add("--besitzer-pid");
+        command.add(String.valueOf(ProcessHandle.current().pid()));
+        if (liveRecordingTarget != null) {
+            command.add("--fall");
+            command.add(liveRecordingTarget.getName());
+            if (liveRecordingTarget.getScenario() != null) {
+                command.add("--szenario");
+                command.add(liveRecordingTarget.getScenario().getName());
+            }
+        }
+        // Dieselbe Kanal-Auflösung wie codegen: eine Aufnahme darf nicht in einem anderen
+        // Browser laufen, nur weil sie einen anderen Weg nimmt.
+        String kanal = browserChannelArgs(resolveRecordingBrowser(projectLocation))
+            .replace(" --channel ", "")
+            .trim();
+        if (!kanal.isEmpty()) {
+            command.add("--kanal");
+            command.add(kanal);
+        }
+        if (startUrl != null && !startUrl.isBlank()) {
+            command.add("--start-url");
+            command.add(startUrl.trim());
+        }
+        logPlaywright(
+            "Dauerbrowser: " +
+            (
+                DAUERBROWSER_WEITER.equals(modus)
+                    ? "die Aufnahme läuft dort weiter, wo der Browser gerade steht."
+                    : "die Aufnahme beginnt bei der Start-Adresse."
+            )
+        );
+        logPlaywright("Belege: " + belege.getAbsolutePath());
+
+        Process process;
+        try {
+            process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        } catch (IOException ex) {
+            logPlaywright(
+                "Node ließ sich nicht starten (" +
+                ex.getMessage() +
+                ") — " +
+                "diese Aufnahme öffnet wie bisher ihr eigenes Fenster."
+            );
+            return false;
+        }
+        activePlaywrightProcess = process;
+
+        boolean scharf = false;
+        try (
+            BufferedReader out = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)
+            )
+        ) {
+            String line;
+            while ((line = out.readLine()) != null) {
+                logPlaywright(line);
+                if (!scharf && line.startsWith("Dauerbrowser bereit")) {
+                    scharf = true;
+                    if (!recorderReadySignaled) {
+                        onRecorderReady();
+                    }
+                }
+            }
+        } catch (IOException ex) {
+            logPlaywrightError("Dauerbrowser-Ausgabe abgebrochen: " + ex.getMessage());
+        }
+
+        int code = -1;
+        try {
+            code = process.waitFor();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+        if (scharf) {
+            // Auch ein von Studio hart beendeter Client zählt als gelaufene Aufnahme: der
+            // Belegsatz entsteht im Daemon, nicht hier.
+            return true;
+        }
+        if (code == DAUERBROWSER_STARTSCHUTZ) {
+            // Die deutsche Erklärung hat der Client schon in die Konsole geschrieben (siehe
+            // rueckfallMeldung); hier steht nur noch, was jetzt passiert.
+            logPlaywright("Aufnahme startet stattdessen mit einem eigenen Fenster (codegen).");
+            return false;
+        }
+        logPlaywright(
+            "Dauerbrowser endete mit Code " +
+            code +
+            ", bevor die Aufnahme scharf war — " +
+            "diese Aufnahme öffnet wie bisher ihr eigenes Fenster."
+        );
+        return false;
+    }
+
+    /**
+     * Der Belegordner dieser Aufnahme: neben der Java-Datei, unter dem Namen der Java-Datei.
+     *
+     * <p>Damit liegt der Beweissatz dort, wo die Aufnahme selbst liegt, und ein zweiter Testfall
+     * überschreibt den ersten nicht — {@code prepareLiveRecordingOutputFile} vergibt pro
+     * Aufnahme einen eigenen Dateinamen.
+     */
+    private static File belegOrdnerFuerAufnahme(File outputFile) {
+        String name = outputFile.getName().replaceFirst("\\.[^.]*$", "");
+        File parent = outputFile.getParentFile();
+        File belege = new File(parent == null ? new File(".") : parent, name + "-belege");
+        belege.mkdirs();
+        return belege;
+    }
+
+    /**
+     * Wo eine Aufnahme anfängt: {@code startadresse} (Vorgabe) oder {@code weiter}.
+     *
+     * <p>Dieselbe Reihenfolge wie {@code AufnahmeStartWahl.gewaehlt()} im Plugin — erst
+     * {@code ING_AUFNAHME_MODUS}, dann die gemerkte Wahl dieses Projekts, dann die Vorgabe.
+     * Zwei Leser, eine Reihenfolge; sonst zeigte die Tafel etwas anderes an, als der Browser tut.
+     */
+    String resolveRecordingStartModus(String projectLocation) {
+        String env = System.getenv("ING_AUFNAHME_MODUS");
+        if (env != null && !env.isBlank()) {
+            return DAUERBROWSER_WEITER.equalsIgnoreCase(env.trim())
+                ? DAUERBROWSER_WEITER
+                : DAUERBROWSER_STARTADRESSE;
+        }
+        Path file;
+        String envFile = System.getenv("ING_QA_AUFNAHME_START_DATEI");
+        String local = System.getenv("LOCALAPPDATA");
+        if (envFile != null && !envFile.isBlank()) {
+            file = Path.of(envFile.trim());
+        } else if (local != null && !local.isBlank()) {
+            file = Path.of(local.trim(), "IngQaAutopilot", "aufnahme-start.json");
+        } else {
+            file =
+                Path.of(
+                    System.getProperty("user.home", "."),
+                    ".IngQaAutopilot",
+                    "aufnahme-start.json"
+                );
+        }
+        if (!Files.isRegularFile(file)) {
+            return DAUERBROWSER_STARTADRESSE;
+        }
+        try {
+            String content = Files.readString(file, StandardCharsets.UTF_8).trim();
+            if (content.startsWith("{")) {
+                String key = projectLocation == null
+                    ? ""
+                    : projectLocation.trim().replace("\\", "/");
+                String value = extractBrowserFromJson(content, key);
+                if (DAUERBROWSER_WEITER.equalsIgnoreCase(value)) {
+                    return DAUERBROWSER_WEITER;
+                }
+            }
+        } catch (IOException | RuntimeException ex) {
+            // Eine unlesbare Datei darf die Aufnahme nicht kosten; die Vorgabe ist die sichere.
+        }
+        return DAUERBROWSER_STARTADRESSE;
+    }
+
+    /**
+     * Findet {@code tools/aufnahme-dauerbrowser.mjs}.
+     *
+     * <p>Dieselben Orte, die {@code WerkzeugPfad} im Plugin absucht, in derselben Reihenfolge:
+     * neben dem Installationsverzeichnis, im Tester-Paket, und als Entwickler-Ausnahme
+     * {@code ING_QA_REPO}. Der Kern kann die Plugin-Klasse nicht benutzen — er kennt das Plugin
+     * nicht —, also steht die Suche hier noch einmal, aber klein und ohne eigene Konvention.
+     */
+    private static File findeDauerbrowserWerkzeug() {
+        String rel = "tools" + File.separator + "aufnahme-dauerbrowser.mjs";
+        List<String> wurzeln = new ArrayList<>();
+        String env = System.getenv("ING_QA_REPO");
+        if (env == null || env.isBlank()) {
+            env = System.getProperty("ing.qa.repo");
+        }
+        if (env != null && !env.isBlank()) {
+            wurzeln.add(env.trim());
+        }
+        String userDir = System.getProperty("user.dir", ".");
+        wurzeln.add(userDir);
+        wurzeln.add(userDir + File.separator + "repo");
+        wurzeln.add(userDir + File.separator + "..");
+        wurzeln.add(userDir + File.separator + ".." + File.separator + "repo");
+        wurzeln.add(userDir + File.separator + ".." + File.separator + "..");
+        for (String wurzel : wurzeln) {
+            File kandidat = new File(wurzel, rel);
+            if (kandidat.isFile()) {
+                return kandidat;
+            }
+        }
+        return null;
     }
 
     /**
