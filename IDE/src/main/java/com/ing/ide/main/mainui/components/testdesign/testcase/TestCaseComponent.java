@@ -1205,16 +1205,26 @@ public class TestCaseComponent extends JPanel implements ActionListener {
             command.add("--kanal");
             command.add(kanal);
         }
-        if (startUrl != null && !startUrl.isBlank()) {
+        boolean hatStartUrl = startUrl != null && !startUrl.isBlank();
+        if (hatStartUrl) {
             command.add("--start-url");
             command.add(startUrl.trim());
         }
+        // Drei Lagen, drei Sätze. Vorher stand hier in allen Fällen „die Aufnahme beginnt bei
+        // der Start-Adresse." — auch dann, wenn das Projekt gar keine hinterlegt hat und
+        // resolveRecordingStartUrl deshalb null lieferte. Ein Protokoll, das etwas behauptet,
+        // was nicht passiert, kostet bei der nächsten Diagnose mehr als es hier spart.
         logPlaywright(
             "Dauerbrowser: " +
             (
                 DAUERBROWSER_WEITER.equals(modus)
                     ? "die Aufnahme läuft dort weiter, wo der Browser gerade steht."
-                    : "die Aufnahme beginnt bei der Start-Adresse."
+                    : hatStartUrl
+                        ? "derselbe Aufnahme-Tab geht auf die Start-Adresse zurück (" +
+                        startUrl.trim() +
+                        ") — die Anmeldung bleibt erhalten."
+                        : "für dieses Projekt ist keine Start-Adresse hinterlegt; die Aufnahme " +
+                        "beginnt dort, wo der Browser gerade steht."
             )
         );
         logPlaywright("Belege: " + belege.getAbsolutePath());
