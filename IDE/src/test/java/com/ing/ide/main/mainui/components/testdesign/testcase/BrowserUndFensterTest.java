@@ -86,21 +86,21 @@ public class BrowserUndFensterTest {
         assertEquals(
             chromeMsg,
             "Der Browser \"Google Chrome\" konnte auf diesem Rechner nicht gefunden werden. " +
-            "Bitte Google Chrome installieren oder einen anderen Browser auswählen."
+            "Bitte Google Chrome installieren oder ohne Kanal aufnehmen (Standard-Chromium)."
         );
 
         String edgeMsg = TestCaseComponent.missingBrowserMessage("msedge");
         assertEquals(
             edgeMsg,
             "Der Browser \"Microsoft Edge\" konnte auf diesem Rechner nicht gefunden werden. " +
-            "Bitte Microsoft Edge installieren oder einen anderen Browser auswählen."
+            "Bitte Microsoft Edge installieren oder ohne Kanal aufnehmen (Standard-Chromium)."
         );
 
         String customMsg = TestCaseComponent.missingBrowserMessage("phantom-browser");
         assertEquals(
             customMsg,
             "Der Browser \"phantom-browser\" konnte auf diesem Rechner nicht gefunden werden. " +
-            "Bitte phantom-browser installieren oder einen anderen Browser auswählen."
+            "Bitte phantom-browser installieren oder ohne Kanal aufnehmen (Standard-Chromium)."
         );
     }
 

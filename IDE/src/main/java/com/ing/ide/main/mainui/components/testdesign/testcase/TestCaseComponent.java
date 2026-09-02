@@ -1807,7 +1807,7 @@ public class TestCaseComponent extends JPanel implements ActionListener {
             "\" konnte auf diesem Rechner nicht gefunden werden. " +
             "Bitte " +
             name +
-            " installieren oder einen anderen Browser auswählen."
+            " installieren oder ohne Kanal aufnehmen (Standard-Chromium)."
         );
     }
 
