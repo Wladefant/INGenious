@@ -1,0 +1,11 @@
+quelle     : Maven-Bau (Dist/pom.xml, Ausfuehrung write-version)
+version    : ${project.parent.version}
+gebaut     : ${maven.build.timestamp}
+java       : ${java.version}
+tests      : unbekannt (haengt an -DskipTests)
+herkunft   : NICHT FESTSTELLBAR. Diese Datei nennt absichtlich keinen Commit und
+             kein "describe": ein Maven-Bau weiss nicht, welcher Git-Stand vor ihm
+             lag, und eine geratene Angabe ist schlimmer als keine.
+             Wer die echte Herkunft braucht, baut mit
+             tools/setup-ingenious-laptop.ps1; das Skript ueberschreibt diese
+             Datei mit Quelle, Zweig, Commit und describe des echten Checkouts.

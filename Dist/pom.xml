@@ -197,6 +197,21 @@
                                         <include>**/*.txt</include>
                                         <include>**/*.md</include>
                                     </includes>
+                                    <!--
+                                      INSTALL-VERSION.txt darf NIE aus Resources kommen.
+                                      Bis zum 02.09.2026 lag dort eine eingecheckte Datei, die
+                                      `describe: 4.0.0-ff1448f5` nannte - eingefroren am 27.08.
+                                      und danach in jedes Paket kopiert, egal welcher Stand
+                                      wirklich gebaut wurde. Der Starter zeigte diese Zeile an,
+                                      also war die Versionsangabe fuer jede Testerin falsch.
+                                      Die Datei entsteht jetzt in der Ausfuehrung write-version
+                                      unten, aus Maven-Werten. Der Ausschluss hier ist der
+                                      Riegel: wer sie versehentlich wieder eincheckt, bekommt
+                                      sie nicht mehr ins Paket.
+                                    -->
+                                    <excludes>
+                                        <exclude>INSTALL-VERSION.txt</exclude>
+                                    </excludes>
                                 </resource>
                                 <resource>
                                     <directory>${resourceDir}</directory>
@@ -206,7 +221,32 @@
                                         <exclude>**/*.command</exclude>
                                         <exclude>**/*.txt</exclude>
                                         <exclude>**/*.md</exclude>
+                                        <exclude>INSTALL-VERSION.txt</exclude>
                                     </excludes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <!--
+                          Die Herkunftsangabe der Installation. Sie wird GEBAUT, nicht
+                          eingecheckt, und sie nennt bewusst KEINEN Commit: Maven kennt den
+                          Git-Stand nicht, und eine geratene Angabe ist schlimmer als keine.
+                          Was hier drinsteht, ist beweisbar wahr - die Reaktor-Version und der
+                          Zeitpunkt des Baus. Den Commit schreibt tools/setup-ingenious-laptop.ps1,
+                          das diese Datei nach dem Entpacken ueberschreibt.
+                        -->
+                        <id>write-version</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${setupDir}</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>src/main/version</directory>
+                                    <filtering>true</filtering>
                                 </resource>
                             </resources>
                         </configuration>
