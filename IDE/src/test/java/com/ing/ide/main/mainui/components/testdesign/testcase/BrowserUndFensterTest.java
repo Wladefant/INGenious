@@ -107,6 +107,7 @@ public class BrowserUndFensterTest {
     @Test
     public void readsRememberedBrowserFromJson() throws IOException {
         Path tempFile = Files.createTempFile("browser-test-", ".json");
+        String prev = System.getProperty("ING_QA_BROWSER_DATEI");
         try {
             String json =
                 "{\n" +
@@ -115,14 +116,90 @@ public class BrowserUndFensterTest {
                 "  \"default\": \"chromium\"\n" +
                 "}";
             Files.writeString(tempFile, json, StandardCharsets.UTF_8);
+            System.setProperty("ING_QA_BROWSER_DATEI", tempFile.toString());
 
-            // Directly test JSON extraction logic
-            String found1 = TestCaseComponent.readRememberedBrowser("C:/Projects/Calimero");
-            // Set env var to test file reading
-            // Since readRememberedBrowser reads ING_QA_BROWSER_DATEI:
-            // Let's test with ING_QA_BROWSER_DATEI if set, or extraction helper
+            assertEquals(TestCaseComponent.readRememberedBrowser("C:/Projects/Calimero"), "chrome");
+            assertEquals(
+                TestCaseComponent.readRememberedBrowser("C:\\Projects\\Calimero"),
+                "chrome"
+            );
+            assertEquals(TestCaseComponent.readRememberedBrowser("C:/Projects/Banking"), "msedge");
+            assertEquals(
+                TestCaseComponent.readRememberedBrowser("C:\\Projects\\Banking"),
+                "msedge"
+            );
+            // Miss returns default or empty
+            assertEquals(
+                TestCaseComponent.readRememberedBrowser("C:/Projects/Unknown"),
+                "chromium"
+            );
         } finally {
+            if (prev != null) {
+                System.setProperty("ING_QA_BROWSER_DATEI", prev);
+            } else {
+                System.clearProperty("ING_QA_BROWSER_DATEI");
+            }
             Files.deleteIfExists(tempFile);
         }
+    }
+
+    @Test
+    public void resolveRecordingStartModusMatchesAcrossSlashVariations() throws IOException {
+        Path tempFile = Files.createTempFile("aufnahme-start-test-", ".json");
+        String prev = System.getProperty("ING_QA_AUFNAHME_START_DATEI");
+        try {
+            String json =
+                "{\n" +
+                "  \"C:/Projects/Calimero\": \"weiter\",\n" +
+                "  \"C:/Projects/Banking\": \"startadresse\"\n" +
+                "}";
+            Files.writeString(tempFile, json, StandardCharsets.UTF_8);
+            System.setProperty("ING_QA_AUFNAHME_START_DATEI", tempFile.toString());
+
+            // Both forward and backward slashes in project location resolve correctly
+            assertEquals(
+                TestCaseComponent.resolveRecordingStartModus("C:/Projects/Calimero"),
+                "weiter"
+            );
+            assertEquals(
+                TestCaseComponent.resolveRecordingStartModus("C:\\Projects\\Calimero"),
+                "weiter"
+            );
+            assertEquals(
+                TestCaseComponent.resolveRecordingStartModus("C:/Projects/Banking"),
+                "startadresse"
+            );
+            assertEquals(
+                TestCaseComponent.resolveRecordingStartModus("C:\\Projects\\Banking"),
+                "startadresse"
+            );
+
+            // Miss falls back to startadresse and logs keys
+            assertEquals(
+                TestCaseComponent.resolveRecordingStartModus("C:/Projects/Unbekannt"),
+                "startadresse"
+            );
+        } finally {
+            if (prev != null) {
+                System.setProperty("ING_QA_AUFNAHME_START_DATEI", prev);
+            } else {
+                System.clearProperty("ING_QA_AUFNAHME_START_DATEI");
+            }
+            Files.deleteIfExists(tempFile);
+        }
+    }
+
+    @Test
+    public void extractKeysFromJsonExtractsAllKeys() {
+        String json =
+            "{\n" +
+            "  \"C:/Projects/Calimero\": \"weiter\",\n" +
+            "  \"C:\\\\Projects\\\\Banking\": \"startadresse\",\n" +
+            "  \"quoted\\\"key\": \"value\"\n" +
+            "}";
+        var keys = TestCaseComponent.extractKeysFromJson(json);
+        assertTrue(keys.contains("C:/Projects/Calimero"), "Keys: " + keys);
+        assertTrue(keys.contains("C:\\Projects\\Banking"), "Keys: " + keys);
+        assertTrue(keys.contains("quoted\"key"), "Keys: " + keys);
     }
 }

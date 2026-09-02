@@ -1301,17 +1301,23 @@ public class TestCaseComponent extends JPanel implements ActionListener {
      * {@code ING_AUFNAHME_MODUS}, dann die gemerkte Wahl dieses Projekts, dann die Vorgabe.
      * Zwei Leser, eine Reihenfolge; sonst zeigte die Tafel etwas anderes an, als der Browser tut.
      */
-    String resolveRecordingStartModus(String projectLocation) {
+    public static String resolveRecordingStartModus(String projectLocation) {
         String env = System.getenv("ING_AUFNAHME_MODUS");
+        if (env == null || env.isBlank()) {
+            env = System.getProperty("ING_AUFNAHME_MODUS");
+        }
         if (env != null && !env.isBlank()) {
             return DAUERBROWSER_WEITER.equalsIgnoreCase(env.trim())
                 ? DAUERBROWSER_WEITER
                 : DAUERBROWSER_STARTADRESSE;
         }
         Path file;
+        String propFile = System.getProperty("ING_QA_AUFNAHME_START_DATEI");
         String envFile = System.getenv("ING_QA_AUFNAHME_START_DATEI");
         String local = System.getenv("LOCALAPPDATA");
-        if (envFile != null && !envFile.isBlank()) {
+        if (propFile != null && !propFile.isBlank()) {
+            file = Path.of(propFile.trim());
+        } else if (envFile != null && !envFile.isBlank()) {
             file = Path.of(envFile.trim());
         } else if (local != null && !local.isBlank()) {
             file = Path.of(local.trim(), "IngQaAutopilot", "aufnahme-start.json");
@@ -1333,12 +1339,33 @@ public class TestCaseComponent extends JPanel implements ActionListener {
                     ? ""
                     : projectLocation.trim().replace("\\", "/");
                 String value = extractBrowserFromJson(content, key);
-                if (DAUERBROWSER_WEITER.equalsIgnoreCase(value)) {
-                    return DAUERBROWSER_WEITER;
+                if (!value.isEmpty()) {
+                    if (DAUERBROWSER_WEITER.equalsIgnoreCase(value)) {
+                        return DAUERBROWSER_WEITER;
+                    }
+                    return DAUERBROWSER_STARTADRESSE;
                 }
+                List<String> keys = extractKeysFromJson(content);
+                String msg =
+                    "Aufnahme-Start: Kein Eintrag für Projektschlüssel \"" +
+                    key +
+                    "\" in " +
+                    file +
+                    " gefunden. Vorhandene Schlüssel: " +
+                    keys +
+                    ". Verwende Vorgabe (Startadresse).";
+                System.out.println(msg);
+                Logger.getLogger(TestCaseComponent.class.getName()).log(Level.INFO, msg);
             }
         } catch (IOException | RuntimeException ex) {
-            // Eine unlesbare Datei darf die Aufnahme nicht kosten; die Vorgabe ist die sichere.
+            String msg =
+                "Aufnahme-Start: Konnte " +
+                file +
+                " nicht lesen (" +
+                ex.getMessage() +
+                "). Verwende Vorgabe (Startadresse).";
+            System.out.println(msg);
+            Logger.getLogger(TestCaseComponent.class.getName()).log(Level.WARNING, msg, ex);
         }
         return DAUERBROWSER_STARTADRESSE;
     }
@@ -1774,11 +1801,14 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         );
     }
 
-    static String readRememberedBrowser(String projectLocation) {
+    public static String readRememberedBrowser(String projectLocation) {
+        String propFile = System.getProperty("ING_QA_BROWSER_DATEI");
+        String envFile = System.getenv("ING_QA_BROWSER_DATEI");
         String local = System.getenv("LOCALAPPDATA");
         Path file;
-        String envFile = System.getenv("ING_QA_BROWSER_DATEI");
-        if (envFile != null && !envFile.isBlank()) {
+        if (propFile != null && !propFile.isBlank()) {
+            file = Path.of(propFile.trim());
+        } else if (envFile != null && !envFile.isBlank()) {
             file = Path.of(envFile.trim());
         } else if (local != null && !local.isBlank()) {
             file = Path.of(local.trim(), "IngQaAutopilot", "browser-wahl.json");
@@ -1799,7 +1829,23 @@ public class TestCaseComponent extends JPanel implements ActionListener {
                 String key = projectLocation == null
                     ? ""
                     : projectLocation.trim().replace("\\", "/");
-                return extractBrowserFromJson(content, key);
+                String value = extractBrowserFromJson(content, key);
+                if (!value.isEmpty()) {
+                    return value;
+                }
+                List<String> keys = extractKeysFromJson(content);
+                if (!keys.isEmpty() && (key != null && !key.isEmpty())) {
+                    String msg =
+                        "Browser-Wahl: Kein Eintrag für Projektschlüssel \"" +
+                        key +
+                        "\" in " +
+                        file +
+                        " gefunden. Vorhandene Schlüssel: " +
+                        keys +
+                        ".";
+                    System.out.println(msg);
+                    Logger.getLogger(TestCaseComponent.class.getName()).log(Level.INFO, msg);
+                }
             }
         } catch (IOException | RuntimeException ex) {
             // ignore
@@ -1807,17 +1853,71 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         return "";
     }
 
-    private static String extractBrowserFromJson(String json, String projectKey) {
+    public static List<String> extractKeysFromJson(String json) {
+        List<String> keys = new ArrayList<>();
+        if (json == null || json.isBlank()) {
+            return keys;
+        }
         try {
-            if (projectKey != null && !projectKey.isEmpty()) {
-                String search = "\"" + projectKey.replace("\"", "\\\"") + "\"";
-                int idx = json.indexOf(search);
-                if (idx >= 0) {
-                    int colon = json.indexOf(':', idx + search.length());
-                    if (colon >= 0) {
-                        int valStart = json.indexOf('"', colon);
+            int pos = 0;
+            while (pos < json.length()) {
+                int keyStart = json.indexOf('"', pos);
+                if (keyStart < 0) break;
+                int keyEnd = json.indexOf('"', keyStart + 1);
+                while (keyEnd > 0 && json.charAt(keyEnd - 1) == '\\') {
+                    keyEnd = json.indexOf('"', keyEnd + 1);
+                }
+                if (keyEnd < 0) break;
+                int colon = json.indexOf(':', keyEnd + 1);
+                if (colon >= 0) {
+                    String between = json.substring(keyEnd + 1, colon).trim();
+                    if (between.isEmpty()) {
+                        String rawKey = json.substring(keyStart + 1, keyEnd);
+                        String unescaped = rawKey.replace("\\\"", "\"").replace("\\\\", "\\");
+                        keys.add(unescaped);
+                        int valStart = json.indexOf('"', colon + 1);
                         if (valStart >= 0) {
                             int valEnd = json.indexOf('"', valStart + 1);
+                            while (valEnd > 0 && json.charAt(valEnd - 1) == '\\') {
+                                valEnd = json.indexOf('"', valEnd + 1);
+                            }
+                            if (valEnd > 0) {
+                                pos = valEnd + 1;
+                                continue;
+                            }
+                        }
+                    }
+                }
+                pos = keyEnd + 1;
+            }
+        } catch (RuntimeException ex) {
+            // ignore
+        }
+        return keys;
+    }
+
+    public static String extractBrowserFromJson(String json, String projectKey) {
+        try {
+            if (projectKey != null && !projectKey.isEmpty()) {
+                String searchKey = projectKey.replace('\\', '/');
+                String search = "\"" + searchKey.replace("\"", "\\\"") + "\"";
+                int idx = json.indexOf(search);
+                int keyLen = search.length();
+                if (idx < 0 && searchKey.contains("/")) {
+                    String backslashSearch =
+                        "\"" + searchKey.replace("/", "\\\\").replace("\"", "\\\"") + "\"";
+                    idx = json.indexOf(backslashSearch);
+                    keyLen = backslashSearch.length();
+                }
+                if (idx >= 0) {
+                    int colon = json.indexOf(':', idx + keyLen);
+                    if (colon >= 0) {
+                        int valStart = json.indexOf('"', colon + 1);
+                        if (valStart >= 0) {
+                            int valEnd = json.indexOf('"', valStart + 1);
+                            while (valEnd > 0 && json.charAt(valEnd - 1) == '\\') {
+                                valEnd = json.indexOf('"', valEnd + 1);
+                            }
                             if (valEnd > valStart) {
                                 return json.substring(valStart + 1, valEnd);
                             }
@@ -1832,6 +1932,9 @@ public class TestCaseComponent extends JPanel implements ActionListener {
                     int valStart = json.indexOf('"', colon);
                     if (valStart >= 0) {
                         int valEnd = json.indexOf('"', valStart + 1);
+                        while (valEnd > 0 && json.charAt(valEnd - 1) == '\\') {
+                            valEnd = json.indexOf('"', valEnd + 1);
+                        }
                         if (valEnd > valStart) {
                             return json.substring(valStart + 1, valEnd);
                         }
