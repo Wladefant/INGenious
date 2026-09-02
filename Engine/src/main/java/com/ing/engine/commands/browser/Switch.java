@@ -47,7 +47,7 @@ public class Switch extends Command {
             Driver.setPage(popup);
             Report.updateTestLog(Action, "Successfully switched to new Page", Status.DONE);
         } catch (Exception e) {
-            Report.updateTestLog(Action, "Something went wrong" + e.getMessage(), Status.DEBUG);
+            Report.updateTestLog(Action, errorMessage(e), Status.DEBUG);
             throw new ActionException(e);
         }
     }
@@ -70,7 +70,7 @@ public class Switch extends Command {
                 Status.DONE
             );
         } catch (Exception e) {
-            Report.updateTestLog(Action, "Something went wrong" + e.getMessage(), Status.DEBUG);
+            Report.updateTestLog(Action, errorMessage(e), Status.DEBUG);
             throw new ActionException(e);
         }
     }
@@ -108,7 +108,7 @@ public class Switch extends Command {
                 Status.DONE
             );
         } catch (Exception e) {
-            Report.updateTestLog(Action, "Something went wrong" + e.getMessage(), Status.DEBUG);
+            Report.updateTestLog(Action, errorMessage(e), Status.DEBUG);
             throw new ActionException(e);
         }
     }
@@ -128,7 +128,7 @@ public class Switch extends Command {
                 Status.DONE
             );
         } catch (Exception e) {
-            Report.updateTestLog(Action, "Something went wrong" + e.getMessage(), Status.DEBUG);
+            Report.updateTestLog(Action, errorMessage(e), Status.DEBUG);
             throw new ActionException(e);
         }
     }
@@ -161,7 +161,7 @@ public class Switch extends Command {
                 Status.DONE
             );
         } catch (Exception e) {
-            Report.updateTestLog(Action, "Something went wrong" + e.getMessage(), Status.DEBUG);
+            Report.updateTestLog(Action, errorMessage(e), Status.DEBUG);
             throw new ActionException(e);
         }
     }
@@ -206,7 +206,7 @@ public class Switch extends Command {
                 );
             }
         } catch (Exception e) {
-            Report.updateTestLog(Action, "Something went wrong" + e.getMessage(), Status.DEBUG);
+            Report.updateTestLog(Action, errorMessage(e), Status.DEBUG);
             throw new ActionException(e);
         }
     }
@@ -251,7 +251,7 @@ public class Switch extends Command {
                 );
             }
         } catch (Exception e) {
-            Report.updateTestLog(Action, "Something went wrong" + e.getMessage(), Status.DEBUG);
+            Report.updateTestLog(Action, errorMessage(e), Status.DEBUG);
             throw new ActionException(e);
         }
     }
@@ -266,7 +266,7 @@ public class Switch extends Command {
             Driver.setPage(pages.get(0));
             Report.updateTestLog(Action, "Successfully switched to main Page", Status.DONE);
         } catch (Exception e) {
-            Report.updateTestLog(Action, "Something went wrong" + e.getMessage(), Status.DEBUG);
+            Report.updateTestLog(Action, errorMessage(e), Status.DEBUG);
             throw new ActionException(e);
         }
     }
@@ -285,6 +285,17 @@ public class Switch extends Command {
             }
         }
         return timeout;
+    }
+
+    private static String errorMessage(Exception e) {
+        if (e == null) {
+            return "Something went wrong";
+        }
+        String msg = e.getMessage();
+        if (msg != null && !msg.isBlank()) {
+            return "Something went wrong: " + msg.trim();
+        }
+        return "Something went wrong: " + e.getClass().getSimpleName();
     }
 
     private static final String AUTHENTICATE_CONTEXT = "isAuthenticated";
