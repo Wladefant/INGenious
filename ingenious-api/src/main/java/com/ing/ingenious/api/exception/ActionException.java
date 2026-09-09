@@ -26,8 +26,18 @@ public class ActionException extends RuntimeException {
      * 
      * @param ex the underlying exception that caused this action to fail
      */
+    public ActionException(String message) {
+        super(message);
+        this.ErrorDescription = message;
+    }
+
+    public ActionException(String message, Throwable cause) {
+        super(message, cause);
+        this.ErrorDescription = message;
+    }
+
     public ActionException(Throwable ex) {
         super(ex);
-        this.ErrorDescription = ex.getMessage();
+        this.ErrorDescription = ex != null ? ex.getMessage() : null;
     }
 }

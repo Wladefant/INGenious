@@ -47,6 +47,19 @@ public class BrowserUndFensterTest {
     public void customBrowserChannelIsPassedThrough() {
         assertEquals(TestCaseComponent.browserChannelArgs("chrome-beta"), " --channel chrome-beta");
         assertEquals(TestCaseComponent.browserChannelArgs("msedge-dev"), " --channel msedge-dev");
+        assertEquals(
+            TestCaseComponent.browserChannelArgs("custom_browser.1"),
+            " --channel custom_browser.1"
+        );
+    }
+
+    @Test
+    public void unsafeBrowserChannelIsRejected() {
+        assertEquals(TestCaseComponent.browserChannelArgs("msedge; rm -rf /"), "");
+        assertEquals(TestCaseComponent.browserChannelArgs("chrome`calc`"), "");
+        assertEquals(TestCaseComponent.browserChannelArgs("edge$(whoami)"), "");
+        assertEquals(TestCaseComponent.browserChannelArgs("channel%20test"), "");
+        assertEquals(TestCaseComponent.browserChannelArgs("browser&calc"), "");
     }
 
     @Test
