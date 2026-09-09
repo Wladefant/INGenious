@@ -1595,6 +1595,13 @@ public class TestCaseComponent extends JPanel implements ActionListener {
      * @param browser the configured browser (e.g. "chrome", "msedge", "chromium", or "")
      * @return {@code " --channel <name>"} or {@code ""} for bundled Chromium
      */
+    static boolean isUsableChannel(String channel) {
+        if (channel == null || channel.isBlank()) {
+            return false;
+        }
+        return channel.trim().matches("^[a-zA-Z0-9._-]+$");
+    }
+
     public static String browserChannelArgs(String browser) {
         if (browser == null || browser.isBlank()) {
             return "";
@@ -1614,7 +1621,13 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         ) {
             return " --channel msedge";
         }
-        return " --channel " + browser.trim();
+        if (isUsableChannel(browser.trim())) {
+            return " --channel " + browser.trim();
+        }
+        Logger
+            .getLogger(TestCaseComponent.class.getName())
+            .warning("Unsafe or invalid browser channel rejected: " + browser);
+        return "";
     }
 
     /**

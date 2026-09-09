@@ -420,17 +420,19 @@ public class PlaywrightDriverFactory {
         );
         if (useStorageState) {
             String storageStatePath = contextDetails.getProperty("storageStatePath");
+            if (storageStatePath == null || storageStatePath.isBlank()) {
+                LOGGER.fine("Storage State nicht konfiguriert — ueberspringe.");
+                return;
+            }
             Path filePath = Paths.get(storageStatePath);
             if (filePath.toFile().exists()) {
-                System.out.println(
-                    "\n========================\nStorage State used : '" +
-                    storageStatePath +
-                    "'\n========================\n"
-                );
+                LOGGER.info("Storage State used: '" + storageStatePath + "'");
                 newContextOptions.setStorageStatePath(filePath);
             } else {
-                System.out.println(
-                    "\n========================\nStorage State Path does not exist. Skipping setting Storage State\n========================\n"
+                LOGGER.warning(
+                    "Storage State Path does not exist: '" +
+                    storageStatePath +
+                    "'. Skipping setting Storage State"
                 );
             }
         }

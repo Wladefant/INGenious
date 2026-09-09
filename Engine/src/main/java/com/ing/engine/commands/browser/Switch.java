@@ -95,6 +95,13 @@ public class Switch extends Command {
                 );
             }
             Browser browser = BrowserContext.browser();
+            if (browser == null) {
+                throw new ActionException(
+                    new RuntimeException(
+                        "Erstellen eines neuen Kontexts wird mit persistentem Browser-Profil nicht unterstuetzt (nur ein Kontext verfuegbar)"
+                    )
+                );
+            }
             BrowserContext = browser.newContext(newContextOptions);
             Page = BrowserContext.newPage();
             Page.navigate(Data, options);
@@ -142,9 +149,15 @@ public class Switch extends Command {
     public void switchToContextByIndex() throws InterruptedException {
         try {
             int index = Integer.parseInt(Data);
-            List<com.microsoft.playwright.BrowserContext> contexts = BrowserContext
-                .browser()
-                .contexts();
+            Browser browser = BrowserContext.browser();
+            if (browser == null) {
+                throw new ActionException(
+                    new RuntimeException(
+                        "Wechseln des Kontexts nach Index wird mit persistentem Browser-Profil nicht unterstuetzt"
+                    )
+                );
+            }
+            List<com.microsoft.playwright.BrowserContext> contexts = browser.contexts();
             BrowserContext = contexts.get(index);
             Thread.sleep(500);
             int pageIndex = 0;
@@ -174,9 +187,15 @@ public class Switch extends Command {
     )
     public void switchToContextByPageTitle() {
         try {
-            List<com.microsoft.playwright.BrowserContext> contexts = BrowserContext
-                .browser()
-                .contexts();
+            Browser browser = BrowserContext.browser();
+            if (browser == null) {
+                throw new ActionException(
+                    new RuntimeException(
+                        "Wechseln des Kontexts nach Seitentitel wird mit persistentem Browser-Profil nicht unterstuetzt"
+                    )
+                );
+            }
+            List<com.microsoft.playwright.BrowserContext> contexts = browser.contexts();
             int pageIndex = 0;
             boolean found = false;
             if (!Condition.isEmpty()) {
@@ -219,9 +238,15 @@ public class Switch extends Command {
     )
     public void switchToContextByPageURL() {
         try {
-            List<com.microsoft.playwright.BrowserContext> contexts = BrowserContext
-                .browser()
-                .contexts();
+            Browser browser = BrowserContext.browser();
+            if (browser == null) {
+                throw new ActionException(
+                    new RuntimeException(
+                        "Wechseln des Kontexts nach URL wird mit persistentem Browser-Profil nicht unterstuetzt"
+                    )
+                );
+            }
+            List<com.microsoft.playwright.BrowserContext> contexts = browser.contexts();
             int pageIndex = 0;
             boolean found = false;
             if (!Condition.isEmpty()) {
