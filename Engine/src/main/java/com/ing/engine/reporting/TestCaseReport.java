@@ -421,8 +421,13 @@ public final class TestCaseReport implements Report, TestCaseReportApi {
             File.separator +
             "img" +
             File.separator +
-            "S" +
-            String.format("%02d", Math.max(0, stepNo)) +
+            Scenario +
+            "_" +
+            TestCase +
+            "_Step-" +
+            stepNo +
+            "_" +
+            DateTimeUtils.TimeNowForFolder() +
             ".png"
         );
     }
