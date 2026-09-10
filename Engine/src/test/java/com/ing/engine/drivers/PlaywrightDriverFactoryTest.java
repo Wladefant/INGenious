@@ -3,6 +3,9 @@ package com.ing.engine.drivers;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.testng.annotations.Test;
 
 /**
@@ -161,7 +164,121 @@ public class PlaywrightDriverFactoryTest {
         // No exception → dimensions parsed successfully
     }
 
+    // ── takeUserDataDir (private static) ────────────────────────────────
+
+    @Test
+    public void testTakeUserDataDirReturnsEmptyWhenAbsent() throws Exception {
+        List<String> caps = new ArrayList<>(
+            Arrays.asList("setChannel=msedge", "setHeadless=false")
+        );
+
+        assertThat(invokeTakeUserDataDir(caps)).isEmpty();
+        assertThat(caps).containsExactly("setChannel=msedge", "setHeadless=false");
+    }
+
+    @Test
+    public void testTakeUserDataDirRemovesTheCapability() throws Exception {
+        List<String> caps = new ArrayList<>(
+            Arrays.asList("setChannel=msedge", "setUserDataDir=/home/tester/profile")
+        );
+
+        // It must leave the list, or it would reach the browser as a command-line argument.
+        assertThat(invokeTakeUserDataDir(caps)).isEqualTo("/home/tester/profile");
+        assertThat(caps).containsExactly("setChannel=msedge");
+    }
+
+    @Test
+    public void testTakeUserDataDirIsCaseInsensitive() throws Exception {
+        List<String> caps = new ArrayList<>(Arrays.asList("setuserdatadir=/home/tester/profile"));
+
+        assertThat(invokeTakeUserDataDir(caps)).isEqualTo("/home/tester/profile");
+    }
+
+    @Test
+    public void testTakeUserDataDirTreatsAnEmptyValueAsUnset() throws Exception {
+        List<String> caps = new ArrayList<>(Arrays.asList("setUserDataDir="));
+
+        assertThat(invokeTakeUserDataDir(caps)).isEmpty();
+    }
+
+    // ── toPersistentContextOptions (private static) ─────────────────────
+
+    @Test
+    public void testPersistentOptionsCarryLaunchAndContextOptions() throws Exception {
+        com.microsoft.playwright.BrowserType.LaunchOptions launchOptions = new com.microsoft.playwright.BrowserType.LaunchOptions()
+            .setChannel("msedge")
+            .setHeadless(false)
+            .setSlowMo(50);
+        com.microsoft.playwright.Browser.NewContextOptions contextOptions = new com.microsoft.playwright.Browser.NewContextOptions()
+            .setLocale("en-GB")
+            .setUserAgent("agent");
+
+        com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions persistentOptions = invokeToPersistentContextOptions(
+            launchOptions,
+            contextOptions
+        );
+
+        assertThat(persistentOptions.channel).isEqualTo("msedge");
+        assertThat(persistentOptions.headless).isFalse();
+        assertThat(persistentOptions.slowMo).isEqualTo(50.0);
+        assertThat(persistentOptions.locale).isEqualTo("en-GB");
+        assertThat(persistentOptions.userAgent).isEqualTo("agent");
+    }
+
+    @Test
+    public void testPersistentOptionsLeaveUnsetOptionsUnset() throws Exception {
+        com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions persistentOptions = invokeToPersistentContextOptions(
+            new com.microsoft.playwright.BrowserType.LaunchOptions(),
+            new com.microsoft.playwright.Browser.NewContextOptions()
+        );
+
+        assertThat(persistentOptions.channel).isNull();
+        assertThat(persistentOptions.headless).isNull();
+        assertThat(persistentOptions.locale).isNull();
+    }
+
+    @Test
+    public void testPersistentOptionsSkipStorageStateWhichHasNoCounterpart() throws Exception {
+        com.microsoft.playwright.Browser.NewContextOptions contextOptions = new com.microsoft.playwright.Browser.NewContextOptions()
+            .setStorageStatePath(java.nio.file.Paths.get("state.json"))
+            .setLocale("nl-NL");
+
+        // The profile on disk already carries the session, so the option is dropped rather
+        // than failing the launch — everything alongside it still arrives.
+        com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions persistentOptions = invokeToPersistentContextOptions(
+            new com.microsoft.playwright.BrowserType.LaunchOptions(),
+            contextOptions
+        );
+
+        assertThat(persistentOptions.locale).isEqualTo("nl-NL");
+    }
+
     // ── Reflection utility methods ──────────────────────────────────────
+
+    private String invokeTakeUserDataDir(List<String> caps) throws Exception {
+        Method m = PlaywrightDriverFactory.class.getDeclaredMethod("takeUserDataDir", List.class);
+        m.setAccessible(true);
+        return (String) m.invoke(null, caps);
+    }
+
+    private com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions invokeToPersistentContextOptions(
+        com.microsoft.playwright.BrowserType.LaunchOptions launchOptions,
+        com.microsoft.playwright.Browser.NewContextOptions contextOptions
+    )
+        throws Exception {
+        Method m =
+            PlaywrightDriverFactory.class.getDeclaredMethod(
+                    "toPersistentContextOptions",
+                    com.microsoft.playwright.BrowserType.LaunchOptions.class,
+                    com.microsoft.playwright.Browser.NewContextOptions.class
+                );
+        m.setAccessible(true);
+        return (com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions) m.invoke(
+            null,
+            launchOptions,
+            contextOptions
+        );
+    }
 
     private Object invokeGetPropertyValue(String value) throws Exception {
         Method m =
