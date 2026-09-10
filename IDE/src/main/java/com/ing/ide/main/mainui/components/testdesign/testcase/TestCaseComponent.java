@@ -10,6 +10,7 @@ import com.ing.datalib.component.TestStep.HEADERS;
 import com.ing.datalib.component.utils.SaveListener;
 import com.ing.datalib.or.web.WebOR;
 import com.ing.datalib.or.web.WebORPage;
+import com.ing.datalib.settings.RecorderSettings;
 import com.ing.engine.constants.SystemDefaults;
 import com.ing.engine.core.LiveRecordingHook;
 import com.ing.engine.core.LiveRecordingService;
@@ -70,6 +71,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.AbstractAction;
@@ -181,6 +183,9 @@ public class TestCaseComponent extends JPanel implements ActionListener {
      * Erklärsatz ausgegeben hat — und die Aufnahme läuft hier wie bisher über codegen weiter.
      */
     static final int DAUERBROWSER_STARTSCHUTZ = 3;
+
+    /** Characters a shell reads even from inside a double-quoted argument. */
+    private static final String UNSAFE_ARGUMENT_CHARS = "\"%$`\n\r";
 
     private final TestDesign testDesign;
 
@@ -1108,25 +1113,32 @@ public class TestCaseComponent extends JPanel implements ActionListener {
 
     /** Der bisherige Weg: ein {@code codegen}-Fenster pro Testfall. Der Rückfall. */
     private void launchCodegen(File outputFile, String startUrl) throws IOException {
-        String escapedPath = outputFile
-            .getAbsolutePath()
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"");
-        String processArgs = "codegen --target java --output \"" + escapedPath + "\"";
         String projectLocation = sMainFrame.getProject().getLocation();
 
         String browser = resolveRecordingBrowser(projectLocation);
         String channelArgs = browserChannelArgs(browser);
         String viewportArgs = viewportArgs();
+        String userDataDir = resolveRecorderUserDataDir();
 
         String storageStateArgs = storageStateArgs(projectLocation);
         // Said out loud on every launch: a recorder that silently did or did not carry the
-        // sign-in over is the exact ambiguity this setting exists to remove.
-        logPlaywright(
-            storageStateArgs.isEmpty()
-                ? "No saved browser session configured. The recorder starts signed out."
-                : "Saved browser session reused:" + storageStateArgs
-        );
+        // sign-in over is the exact ambiguity these settings exist to remove.
+        if (userDataDir != null) {
+            // buildCodegenArgs drops the state file when a profile is configured; the log has
+            // to tell the same story, or the tester reads a sign-in promise that was not kept.
+            logPlaywright(
+                storageStateArgs.isEmpty()
+                    ? "Recorder profile in use. Sign-in state comes from the profile."
+                    : "Recorder profile in use. The saved browser session is not passed on:" +
+                    " the profile carries its own."
+            );
+        } else {
+            logPlaywright(
+                storageStateArgs.isEmpty()
+                    ? "No saved browser session configured. The recorder starts signed out."
+                    : "Saved browser session reused:" + storageStateArgs
+            );
+        }
         logPlaywright(
             channelArgs.isEmpty()
                 ? "Recorder browser: bundled Chromium (default)"
@@ -1134,16 +1146,13 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         );
         logPlaywright("Recorder viewport:" + viewportArgs);
 
-        processArgs += channelArgs;
-        processArgs += viewportArgs;
-        processArgs += saveStorageArgs(projectLocation);
-        processArgs += storageStateArgs;
-        if (startUrl != null) {
-            // Quoted: the command is handed to cmd/bash as one string, and an unquoted query
-            // string would be cut at its first '&'. Validation upstream has already ruled out
-            // anything that could break out of these quotes.
-            processArgs += " \"" + startUrl + "\"";
-        }
+        String processArgs = buildCodegenArgs(
+            outputFile,
+            startUrl,
+            channelArgs + viewportArgs + saveStorageArgs(projectLocation),
+            userDataDir,
+            storageStateArgs
+        );
         runPlaywrightProcess(processArgs);
         logPlaywright(
             "============================== Playwright Log Ended =============================="
@@ -1970,6 +1979,72 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         return "";
     }
 
+    /**
+     * Assembles the codegen command line.
+     *
+     * <p>Options come before the address because the address is a positional argument.
+     * Everything but the output file is optional, and leaving all of it out produces exactly
+     * the command the recorder has always run.
+     *
+     * <p>A persistent profile and a saved-session file answer the same question — where does
+     * the sign-in come from — so when both are configured the profile wins and the state file
+     * is dropped: Playwright accepts the pair, but a stale state file would overwrite the
+     * profile's live session, which is the very sign-in the profile exists to keep.
+     *
+     * @param outputFile file codegen writes the recorded script to
+     * @param startUrl page to open, or {@code null} for codegen's blank page
+     * @param optionArgs the options already assembled elsewhere — browser channel, viewport and
+     *        {@code --save-storage} — each with its leading space, or {@code ""}
+     * @param userDataDir profile directory to reuse, or {@code null}/empty for a fresh profile
+     * @param storageStateArgs {@code --load-storage} option as built by
+     *        {@link #storageStateArgs(String)}, leading space included, or {@code ""}
+     * @return the arguments to hand to the Playwright CLI
+     */
+    static String buildCodegenArgs(
+        File outputFile,
+        String startUrl,
+        String optionArgs,
+        String userDataDir,
+        String storageStateArgs
+    ) {
+        StringBuilder args = new StringBuilder("codegen --target java --output \"")
+            .append(escapeQuotedArgument(outputFile.getAbsolutePath()))
+            .append('"');
+        boolean persistentProfile = userDataDir != null && !userDataDir.isEmpty();
+        if (optionArgs != null && !optionArgs.isEmpty()) {
+            // Already escaped and formatted by the methods that built them, leading space
+            // included: a channel that passed isUsableChannel needs no quoting at all.
+            args.append(optionArgs);
+        }
+        if (persistentProfile) {
+            args
+                .append(" --user-data-dir \"")
+                .append(escapeQuotedArgument(userDataDir))
+                .append('"');
+        }
+        if (!persistentProfile && storageStateArgs != null && !storageStateArgs.isEmpty()) {
+            // Escaped and formatted by storageStateArgs(), leading space included.
+            args.append(storageStateArgs);
+        }
+        if (startUrl != null) {
+            // Quoted: the command is handed to cmd/bash as one string, and an unquoted query
+            // string would be cut at its first '&'. Validation upstream has already ruled out
+            // anything that could break out of these quotes.
+            args.append(" \"").append(startUrl).append('"');
+        }
+        return args.toString();
+    }
+
+    /**
+     * Escapes a value for the double-quoted argument it is placed in.
+     *
+     * @param value the raw value
+     * @return the value with backslashes and quotes escaped
+     */
+    private static String escapeQuotedArgument(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
     private Process runPlaywrightProcess(String processArgs) throws IOException {
         Process process = startPlaywrightProcess(processArgs);
         if (process == null) {
@@ -2301,6 +2376,65 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         }
 
         return null;
+    }
+
+    /**
+     * The profile directory the recording reuses, or nothing — which is a fresh profile per
+     * recording, i.e. the behaviour every existing project already has.
+     *
+     * @return a usable directory, or {@code null} to record with a fresh profile
+     */
+    private String resolveRecorderUserDataDir() {
+        String configured = readRecorderSetting(RecorderSettings::getBrowserUserDataDir);
+        if (configured.isEmpty()) {
+            return null;
+        }
+        if (!isUsableShellArgument(configured)) {
+            logPlaywright("Ignoring unusable recorder profile directory: " + configured);
+            return null;
+        }
+        logPlaywright("Using the browser profile in " + configured);
+        return configured;
+    }
+
+    /**
+     * Reads one value from the project's recorder settings, treating an unreadable project as
+     * an unconfigured one.
+     *
+     * @param reader the accessor for the wanted value
+     * @return the configured value, or an empty string
+     */
+    private String readRecorderSetting(Function<RecorderSettings, String> reader) {
+        try {
+            return reader.apply(testDesign.getProject().getProjectSettings().getRecorderSettings());
+        } catch (RuntimeException ex) {
+            Logger
+                .getLogger(TestCaseComponent.class.getName())
+                .log(Level.WARNING, "Unable to read the project's recorder settings", ex);
+            return "";
+        }
+    }
+
+    /**
+     * A value that survives being placed inside a double-quoted argument of the recorder
+     * command.
+     *
+     * <p>The command is assembled as one string and handed to a shell, and quotes alone do not
+     * stop every shell from reading a value: a percent sign is what a Windows shell expands,
+     * and a dollar sign or a backtick is what a POSIX shell expands, inside double quotes as
+     * much as outside them. A value carrying one of those is refused with a note in the console
+     * rather than silently mangled or, worse, executed.
+     *
+     * @param value the configured value
+     * @return {@code true} when it is safe to pass to the recorder
+     */
+    private boolean isUsableShellArgument(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            if (UNSAFE_ARGUMENT_CHARS.indexOf(value.charAt(i)) >= 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

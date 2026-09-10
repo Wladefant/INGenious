@@ -5,7 +5,9 @@ package com.ing.datalib.settings;
  *
  * <p>Today the recorder opens a blank page and every recording starts by typing the
  * application's address by hand. A project is written against one application, so the address
- * belongs to the project, not to the person recording.
+ * belongs to the project, not to the person recording. The same holds for the browser the
+ * recording runs in: which installed browser a project has to be recorded with is a property of
+ * the application, not of the tester.
  *
  * <p>Empty is the default and stays valid: a project that sets nothing behaves exactly as it
  * did before.
@@ -13,6 +15,7 @@ package com.ing.datalib.settings;
 public class RecorderSettings extends AbstractPropSettings {
     private static final String START_URL = "StartUrl";
     private static final String BROWSER = "Browser";
+    private static final String BROWSER_USER_DATA_DIR = "BrowserUserDataDir";
 
     public RecorderSettings(String location) {
         super(location, "RecorderSettings");
@@ -40,6 +43,10 @@ public class RecorderSettings extends AbstractPropSettings {
      * The browser or channel the recorder uses (e.g. {@code "chrome"}, {@code "msedge"}, or
      * {@code ""} for Playwright's bundled Chromium).
      *
+     * <p>Playwright's own browser build is a plain browser with no relation to the machine it
+     * runs on, so it cannot present whatever identity an installed, managed browser presents. A
+     * project whose application requires that identity names the installed distribution here.
+     *
      * @return the browser name or channel, or an empty string when using the default bundled Chromium
      */
     public String getBrowser() {
@@ -53,5 +60,32 @@ public class RecorderSettings extends AbstractPropSettings {
      */
     public void setBrowser(String value) {
         setProperty(BROWSER, value == null ? "" : value.trim());
+    }
+
+    /**
+     * The directory holding the browser profile the recorder reuses between recordings.
+     *
+     * <p>Without one, every {@code codegen} recording starts from an empty profile: no cookies,
+     * no sign-in, no certificates, nothing the browser stored last time. Pointing at a directory
+     * keeps that state on disk, so a recording resumes where the previous one left off instead
+     * of signing in again — which is what a managed device's sign-in policy needs, because an
+     * identity it has already trusted survives in the profile.
+     *
+     * <p>Only the {@code codegen} path reads this. The Dauerbrowser keeps its own profile in its
+     * daemon folder, so pointing this at that folder would have the two fight over one profile.
+     *
+     * @return the directory, or an empty string when the project has not set one
+     */
+    public String getBrowserUserDataDir() {
+        return getProperty(BROWSER_USER_DATA_DIR, "").trim();
+    }
+
+    /**
+     * Sets the directory holding the browser profile the recorder reuses.
+     *
+     * @param value the directory; {@code null} or blank restores a fresh profile per recording
+     */
+    public void setBrowserUserDataDir(String value) {
+        setProperty(BROWSER_USER_DATA_DIR, value == null ? "" : value.trim());
     }
 }
