@@ -1172,7 +1172,7 @@ public class TestCaseComponent extends JPanel implements ActionListener {
      * @return {@code true}, wenn die Aufnahme im Dauerbrowser gelaufen ist; {@code false},
      *     wenn stattdessen auf {@code codegen} zurückgefallen werden muss
      */
-    private boolean launchDauerbrowser(File outputFile, String startUrl) {
+    private boolean launchDauerbrowser(File outputFile, String startUrl) throws IOException {
         File werkzeug = findeDauerbrowserWerkzeug();
         if (werkzeug == null) {
             logPlaywright(
@@ -1278,24 +1278,34 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }
+        boolean abgeschlossen = dauerbrowserErgebnis(scharf, code);
+        if (!abgeschlossen) {
+            logPlaywright("Aufnahme startet stattdessen mit einem eigenen Fenster (codegen).");
+        }
+        return abgeschlossen;
+    }
+
+    /**
+     * Nur ein ausdrücklicher Startschutz erlaubt den Rückfall. Ein Timeout, ein
+     * abgebrochener Client oder ein anderer Fehler sagt NICHT, dass der abgetrennte
+     * Dauerbrowser beendet ist. Codegen würde dann einen zweiten Browser öffnen.
+     */
+    static boolean dauerbrowserErgebnis(boolean scharf, int code) throws IOException {
         if (scharf) {
             // Auch ein von Studio hart beendeter Client zählt als gelaufene Aufnahme: der
             // Belegsatz entsteht im Daemon, nicht hier.
             return true;
         }
         if (code == DAUERBROWSER_STARTSCHUTZ) {
-            // Die deutsche Erklärung hat der Client schon in die Konsole geschrieben (siehe
-            // rueckfallMeldung); hier steht nur noch, was jetzt passiert.
-            logPlaywright("Aufnahme startet stattdessen mit einem eigenen Fenster (codegen).");
             return false;
         }
-        logPlaywright(
+        throw new IOException(
             "Dauerbrowser endete mit Code " +
             code +
-            ", bevor die Aufnahme scharf war — " +
-            "diese Aufnahme öffnet wie bisher ihr eigenes Fenster."
+            ", bevor die Aufnahme bereit war. " +
+            "Die vorhandene Browser-Sitzung bleibt unverändert; es wird kein zweiter " +
+            "Rekorder geöffnet. Bitte Aufnahme-Protokoll prüfen und danach erneut starten."
         );
-        return false;
     }
 
     /**
