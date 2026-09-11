@@ -106,6 +106,34 @@ public class StartansichtTest {
     }
 
     @Test
+    public void readsTheFileInTheShapePowerShellActuallyWrites() throws IOException {
+        // What INSTALLIEREN.ps1 leaves behind: ConvertTo-Json piped into Set-Content, so CRLF
+        // line endings, four-space indentation, escaped Windows paths, the switch somewhere in
+        // the middle. Every other test here writes LF, which is not what any tester's machine
+        // has - the reader has to be indifferent to that, and this is where it is shown.
+        writeConfiguration(
+            "\uFEFF{\r\n" +
+            "    \"ziel\": \"C:\\\\Users\\\\PC28GR\\\\AppData\\\\Local\\\\ING-Testautomatisierung\",\r\n" +
+            "    \"javaHome\": \"C:\\\\Program Files\\\\Microsoft\\\\jdk-17\",\r\n" +
+            "    \"startansicht\": \"testing\",\r\n" +
+            "    \"zuletzt\": \"2026-09-11 09:12\"\r\n" +
+            "}\r\n"
+        );
+
+        assertThat(Startansicht.wunsch()).isEqualTo("testing");
+    }
+
+    @Test
+    public void aSwitchThatIsNotAStringLeavesTheDefaultStanding() throws IOException {
+        // Somebody edits the file by hand and writes a number or a boolean. There is no value
+        // to read, so nothing was said - and the neighbouring keys must not be misread as the
+        // answer either.
+        writeConfiguration("{\"startansicht\": 1, \"ziel\": \"C:\\\\ING\"}");
+
+        assertThat(Startansicht.wunsch()).isEqualTo("testing");
+    }
+
+    @Test
     public void anUnreadableConfigurationCostsNobodyTheStart() throws IOException {
         // Truncated mid-string: the file exists, is not JSON, and must read as "nothing said".
         writeConfiguration("{\"startansicht\": \"tes");
