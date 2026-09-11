@@ -26,6 +26,7 @@ import com.ing.ide.main.mainui.components.aichat.AICopilot;
 import com.ing.ide.main.mainui.components.apitester.APITester;
 import com.ing.ide.main.mainui.components.testdesign.TestDesign;
 import com.ing.ide.main.mainui.components.testexecution.TestExecution;
+import com.ing.ide.main.mainui.plugins.Startansicht;
 import com.ing.ide.main.mainui.plugins.StudioPanelPlugins;
 import com.ing.ide.main.shr.SHR;
 import com.ing.ide.main.ui.About;
@@ -46,6 +47,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -108,6 +110,12 @@ public class AppMainFrame extends JFrame {
     private final LoaderScreen loader;
 
     private final Set<String> pluginPanelSlides = new HashSet<>();
+
+    /**
+     * Whether this session has already offered its start screen. Set on the first project
+     * load, so opening a second project later leaves the tester where they were working.
+     */
+    private boolean startansichtGezeigt;
 
     /**
      * What a plugin screen is given so it can record its decisions where the project keeps
@@ -273,6 +281,47 @@ public class AppMainFrame extends JFrame {
             slideShow.addSlide(slideName, component);
         }
         slideShow.showSlide(slideName);
+    }
+
+    /**
+     * Brings the configured start screen to the front, once per Studio session.
+     *
+     * <p>Studio opens on Test Design, which is the right screen for whoever builds test cases
+     * and the wrong one for whoever only records and hands in: that tester had to find the
+     * right toolbar button first, every single morning. The switch {@code startansicht} in the
+     * installation's {@code konfiguration.json} names the screen that should be in front
+     * instead — see {@link Startansicht} for where it is read and what turns it off.
+     *
+     * <p>Called from {@link #afterProjectChange()} rather than from {@link #init()}: a plugin
+     * screen is handed the open project's test data when it is built, so before a project is
+     * loaded there is nothing to build it with. The decision itself is
+     * {@link Startansicht#zuOeffnen}, which is why it can be proven without a window.
+     */
+    private void startansicht() {
+        List<Startansicht.Kandidat> kandidaten = new ArrayList<>();
+        for (StudioPanelPlugins.Panel panel : StudioPanelPlugins.load()) {
+            kandidaten.add(
+                new Startansicht.Kandidat(
+                    panel.getIdentity(),
+                    panel.getTitle(),
+                    StudioPanelPlugins.slideName(panel.getIdentity())
+                )
+            );
+        }
+        String identity = Startansicht.zuOeffnen(
+            Startansicht.wunsch(),
+            getCurrentSlide(),
+            kandidaten,
+            startansichtGezeigt
+        );
+        // One attempt per session, whatever came of it: a tester who switched away from the
+        // start screen and then opened another project is not thrown back to it.
+        startansichtGezeigt = true;
+        if (identity == null) {
+            return;
+        }
+        showPluginPanel(identity);
+        toFront();
     }
 
     private void progressed(int val) {
@@ -943,6 +992,7 @@ public class AppMainFrame extends JFrame {
         if (fxStatusBar != null) {
             fxStatusBar.setProjectName(sProject.getName());
         }
+        startansicht();
     }
 
     public void adjustUI() {
