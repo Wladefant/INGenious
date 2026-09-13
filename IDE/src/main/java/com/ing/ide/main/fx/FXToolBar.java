@@ -126,12 +126,38 @@ public class FXToolBar extends JFXPanel {
      */
     private Button createPluginPanelButton(StudioPanelPlugins.Panel panel) {
         Button btn = new Button(panel.getTitle());
-        btn.getStyleClass().add("workbench-btn");
+        if (isTestINGPanel(panel)) {
+            btn.getStyleClass().add("testing-btn");
+            org.kordamp.ikonli.javafx.FontIcon icon = INGIcons.fx(
+                "TestING",
+                16,
+                javafx.scene.paint.Color.WHITE
+            );
+            if (icon != null) {
+                btn.setGraphic(icon);
+            }
+        } else {
+            btn.getStyleClass().add("workbench-btn");
+        }
         btn.setTooltip(new Tooltip(panel.getTooltip()));
         btn.setOnAction(
             e -> fireSwingAction(StudioPanelPlugins.ACTION_PREFIX + panel.getIdentity())
         );
         return btn;
+    }
+
+    private static boolean isTestINGPanel(StudioPanelPlugins.Panel panel) {
+        if (panel == null) {
+            return false;
+        }
+        String id = panel.getIdentity();
+        String title = panel.getTitle();
+        return (
+            "ing-tester-panel".equalsIgnoreCase(id) ||
+            "TestING".equalsIgnoreCase(title) ||
+            (id != null && id.toLowerCase().contains("testing")) ||
+            (title != null && title.toLowerCase().contains("testing"))
+        );
     }
 
     private Button createAICopilotButton() {

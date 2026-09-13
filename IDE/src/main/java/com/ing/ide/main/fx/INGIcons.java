@@ -30,6 +30,7 @@ public final class INGIcons {
     public static final Color ING_ORANGE = Color.web("#FF6200");
     public static final Color ING_PURPLE = Color.web("#7724FF");
     public static final Color ING_LIGHT_BLUE = Color.web("#89D6FD");
+    public static final Color ING_BLUE = Color.web("#0F5BD7");
     public static final Color ING_BURGUNDY = Color.web("#4D0020");
     public static final Color ING_GREEN = Color.web("#349651");
     public static final Color ING_WARM_TEXT = Color.web("#4D0020");
@@ -123,6 +124,7 @@ public final class INGIcons {
         COLOR_MAP_DARK.put("or.StructuredData", CLR_DATA_DARK);
         COLOR_MAP_DARK.put("or.SAP", CLR_DATA_DARK);
         COLOR_MAP_DARK.put("or.Root", CLR_DATA_DARK);
+        COLOR_MAP_DARK.put("TestING", Color.WHITE);
 
         // ── Tree: Reusable ──
         register("reusable.Root", MaterialDesignR.RECYCLE, CLR_SAVE);
@@ -139,6 +141,7 @@ public final class INGIcons {
         register("ArchetypeConfigurations", MaterialDesignW.WEB, CLR_TOOL);
         register("APITester", MaterialDesignA.API, CLR_DATA);
         register("AICopilot", FontAwesomeBrands.GITHUB, CLR_DATA);
+        register("TestING", MaterialDesignP.PLAY_CIRCLE, Color.WHITE);
 
         // ── Common Actions ──
         register("add", MaterialDesignP.PLUS, CLR_CREATE);

@@ -22,6 +22,7 @@
     -ing-blue-light:      #F0EAFF;
     -ing-burgundy:        #4D0020;
     -ing-orange:          #FF6200;
+    -ing-brand-blue:      #0F5BD7;
 
     /* Surfaces */
     -ing-bg:              #FFFFFF;
@@ -82,6 +83,7 @@
     -ing-accent-light:    #2A1A4A;
     -ing-purple-light:    #2A1A4A;
     -ing-blue-light:      #1A2A3D;
+    -ing-brand-blue:      #0F5BD7;
 }
 
 
@@ -406,6 +408,67 @@
 
 .tool-bar .button.workbench-btn .ikonli-font-icon {
     -fx-icon-color: #111111;
+}
+
+/* Dedicated TestING button in toolbar - Issue #574 */
+.tool-bar .button.testing-btn {
+    -fx-background-color: #0F5BD7;
+    -fx-border-radius: 9;
+    -fx-background-radius: 9;
+    -fx-padding: 6 14 6 12;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #FFFFFF;
+    -fx-graphic-text-gap: 6;
+    -fx-translate-y: 0;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(15, 91, 215, 0.35), 9, 0, 0, 2);
+}
+
+.tool-bar .button.testing-btn:hover {
+    -fx-background-color: #1967D2;
+    -fx-translate-y: -1;
+    -fx-effect: dropshadow(gaussian, rgba(15, 91, 215, 0.45), 14, 0, 0, 4);
+}
+
+.tool-bar .button.testing-btn:pressed {
+    -fx-background-color: #0B46A8;
+    -fx-translate-y: 0;
+    -fx-effect: dropshadow(gaussian, rgba(15, 91, 215, 0.20), 6, 0, 0, 1);
+}
+
+.tool-bar .button.testing-btn > .text {
+    -fx-fill: #FFFFFF;
+}
+
+.tool-bar .button.testing-btn .ikonli-font-icon {
+    -fx-icon-color: #FFFFFF;
+}
+
+.dark-theme .tool-bar .button.testing-btn {
+    -fx-background-color: #0F5BD7;
+    -fx-text-fill: #FFFFFF;
+    -fx-effect: dropshadow(gaussian, rgba(15, 91, 215, 0.50), 9, 0, 0, 2);
+}
+
+.dark-theme .tool-bar .button.testing-btn:hover {
+    -fx-background-color: #1967D2;
+    -fx-translate-y: -1;
+    -fx-effect: dropshadow(gaussian, rgba(15, 91, 215, 0.70), 14, 0, 0, 4);
+}
+
+.dark-theme .tool-bar .button.testing-btn:pressed {
+    -fx-background-color: #0B46A8;
+    -fx-translate-y: 0;
+    -fx-effect: dropshadow(gaussian, rgba(15, 91, 215, 0.30), 6, 0, 0, 1);
+}
+
+.dark-theme .tool-bar .button.testing-btn > .text {
+    -fx-fill: #FFFFFF;
+}
+
+.dark-theme .tool-bar .button.testing-btn .ikonli-font-icon {
+    -fx-icon-color: #FFFFFF;
 }
 
 
