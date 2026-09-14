@@ -1200,8 +1200,10 @@ public class TestCaseComponent extends JPanel implements ActionListener {
                     startUrl = fortsetzen.letzteUrl.trim();
                 }
             } else {
+                // Der Auftrag gehoert einem anderen Testfall — er bleibt dessen Auftrag.
+                gibFortsetzenAuftragZurueck(fortsetzen, null);
                 logPlaywright(
-                    "Fortsetzen-Auftrag verworfen: Testfall \"" +
+                    "Fortsetzen-Auftrag bleibt liegen: Testfall \"" +
                     fortsetzen.testCaseId +
                     "\" passt nicht zum Ziel \"" +
                     targetName +
@@ -1286,6 +1288,12 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         try {
             process = new ProcessBuilder(command).redirectErrorStream(true).start();
         } catch (IOException ex) {
+            if (fortsetzen != null) {
+                throw fortsetzenStartFehlgeschlagen(
+                    fortsetzen,
+                    "Node ließ sich nicht starten (" + ex.getMessage() + ")"
+                );
+            }
             logPlaywright(
                 "Node ließ sich nicht starten (" +
                 ex.getMessage() +
@@ -1297,36 +1305,89 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         activePlaywrightProcess = process;
 
         boolean scharf = false;
-        try (
-            BufferedReader out = new BufferedReader(
-                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)
-            )
-        ) {
-            String line;
-            while ((line = out.readLine()) != null) {
-                logPlaywright(line);
-                if (!scharf && line.startsWith("Dauerbrowser bereit")) {
-                    scharf = true;
-                    if (!recorderReadySignaled) {
-                        onRecorderReady();
+        try {
+            try (
+                BufferedReader out = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)
+                )
+            ) {
+                String line;
+                while ((line = out.readLine()) != null) {
+                    logPlaywright(line);
+                    if (!scharf && line.startsWith("Dauerbrowser bereit")) {
+                        scharf = true;
+                        // Erst hier ist der Auftrag erfüllt: die Aufnahme läuft wirklich.
+                        verbraucheFortsetzenAuftrag(fortsetzen);
+                        if (!recorderReadySignaled) {
+                            onRecorderReady();
+                        }
                     }
                 }
+            } catch (IOException ex) {
+                logPlaywrightError("Dauerbrowser-Ausgabe abgebrochen: " + ex.getMessage());
             }
-        } catch (IOException ex) {
-            logPlaywrightError("Dauerbrowser-Ausgabe abgebrochen: " + ex.getMessage());
-        }
 
-        int code = -1;
-        try {
-            code = process.waitFor();
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
+            int code = -1;
+            try {
+                code = process.waitFor();
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+            if (!scharf && fortsetzen != null) {
+                // Startschutz oder Abbruch vor der ersten Seite: kein Rückfall auf codegen,
+                // denn der würde mit einem frischen Belegsatz bei Teil 1 anfangen und die
+                // Nacht von gestern stehen lassen.
+                throw fortsetzenStartFehlgeschlagen(
+                    fortsetzen,
+                    "Dauerbrowser endete mit Code " + code + ", bevor die Aufnahme bereit war"
+                );
+            }
+            boolean abgeschlossen = dauerbrowserErgebnis(scharf, code);
+            if (!abgeschlossen) {
+                logPlaywright("Aufnahme startet stattdessen mit einem eigenen Fenster (codegen).");
+            }
+            return abgeschlossen;
+        } finally {
+            if (!scharf) {
+                // Jeder andere Ausgang (auch eine geworfene Ausnahme) lässt den Auftrag offen.
+                gibFortsetzenAuftragZurueck(fortsetzen, "Aufnahme wurde nicht gestartet");
+            }
         }
-        boolean abgeschlossen = dauerbrowserErgebnis(scharf, code);
-        if (!abgeschlossen) {
-            logPlaywright("Aufnahme startet stattdessen mit einem eigenen Fenster (codegen).");
-        }
-        return abgeschlossen;
+    }
+
+    /**
+     * Der Fortsetz-Auftrag bleibt offen, und die Aufnahme beginnt NICHT von vorn.
+     *
+     * <p>Ein Rückfall auf {@code codegen} bekäme die Projekt-Startadresse und einen frischen
+     * Belegordner mit {@code teil=1} — der Teil der Nacht bliebe verwaist, unter einem
+     * Erfolgsbanner. Darum endet dieser Weg mit einer Ausnahme: {@code record()} protokolliert
+     * sie, das Panel meldet den Fehlschlag, und der Auftrag liegt für den nächsten Versuch
+     * wieder als {@code fortsetzen.json} bereit.
+     */
+    private IOException fortsetzenStartFehlgeschlagen(FortsetzAuftrag fortsetzen, String grund) {
+        boolean zurueck = gibFortsetzenAuftragZurueck(fortsetzen, grund);
+        logPlaywrightError(
+            grund +
+            " — die Aufnahme wird NICHT fortgesetzt und es wird kein neuer Belegsatz begonnen."
+        );
+        logPlaywright(
+            zurueck
+                ? "Fortsetzen bleibt offen: Teil " +
+                fortsetzen.teil +
+                " in Belegordner " +
+                fortsetzen.belegeOrdner +
+                " ab Schritt " +
+                (fortsetzen.schrittOffset + 1) +
+                ". Ursache beheben und \"Aufnahme starten\" erneut drücken."
+                : "Fortsetz-Auftrag konnte nicht zurückgelegt werden; in Schritt 3 erneut auf " +
+                "\"Diesen Anlauf hier fortsetzen\" klicken."
+        );
+        return new IOException(
+            grund +
+            ". Die Aufnahme wurde nicht fortgesetzt; der Fortsetz-Auftrag für Teil " +
+            fortsetzen.teil +
+            " bleibt offen. Es wurde kein neuer Belegsatz angelegt."
+        );
     }
 
     /**
@@ -1476,6 +1537,17 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         return null;
     }
 
+    /**
+     * Ein geliehener Fortsetz-Auftrag.
+     *
+     * <p><b>Geliehen, nicht verbraucht.</b> Der Auftrag wird beim Lesen aus
+     * {@code fortsetzen.json} in eine prozess-eigene Claim-Datei umbenannt — damit kann ihn
+     * keine zweite Studio-Instanz ebenfalls bekommen. Verbraucht ist er erst, wenn die
+     * Aufnahme wirklich laeuft ({@link #verbraucheFortsetzenAuftrag}); scheitert der Start,
+     * geht er unveraendert zurueck ({@link #gibFortsetzenAuftragZurueck}). Vorher wurde er
+     * beim Lesen geloescht, und ein gescheiterter Start hat die Nacht-Aufnahme still
+     * verloren: codegen begann mit einem frischen Belegsatz bei Teil 1.
+     */
     static class FortsetzAuftrag {
         final String testCaseId;
         final String belegeOrdner;
@@ -1483,6 +1555,10 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         final int teil;
         final int schrittOffset;
         final String belegsatzId;
+        /** Die prozess-eigene Claim-Datei, solange der Auftrag geliehen ist. */
+        final Path claimDatei;
+        /** Der Wortlaut der Auftragsdatei — so geht er beim Zurueckgeben zurueck. */
+        final String rohJson;
 
         FortsetzAuftrag(
             String testCaseId,
@@ -1492,12 +1568,27 @@ public class TestCaseComponent extends JPanel implements ActionListener {
             int schrittOffset,
             String belegsatzId
         ) {
+            this(testCaseId, belegeOrdner, letzteUrl, teil, schrittOffset, belegsatzId, null, "");
+        }
+
+        FortsetzAuftrag(
+            String testCaseId,
+            String belegeOrdner,
+            String letzteUrl,
+            int teil,
+            int schrittOffset,
+            String belegsatzId,
+            Path claimDatei,
+            String rohJson
+        ) {
             this.testCaseId = testCaseId == null ? "" : testCaseId.trim();
             this.belegeOrdner = belegeOrdner == null ? "" : belegeOrdner.trim();
             this.letzteUrl = letzteUrl == null ? "" : letzteUrl.trim();
             this.teil = teil > 0 ? teil : 1;
             this.schrittOffset = Math.max(0, schrittOffset);
             this.belegsatzId = belegsatzId == null ? "" : belegsatzId.trim();
+            this.claimDatei = claimDatei;
+            this.rohJson = rohJson == null ? "" : rohJson;
         }
 
         boolean passtZuTestfall(String targetName) {
@@ -1546,10 +1637,25 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         }
     }
 
+    /**
+     * Holt den Fortsetz-Auftrag — geliehen, nicht verbraucht.
+     *
+     * <p>Der Name ist der alte, weil die Wirkung nach aussen die alte ist:
+     * {@code fortsetzen.json} ist nach diesem Aufruf weg, ein zweiter Aufruf liefert
+     * {@code null}, und ein spaeterer {@code record()}-Klick ohne neuen Fortsetzen-Klick
+     * nimmt wieder normal auf. Der Unterschied liegt im Scheitern: der Wortlaut des Auftrags
+     * liegt bis zum Beweis der laufenden Aufnahme in einer Claim-Datei und geht zurueck,
+     * statt verloren zu gehen.
+     */
     static FortsetzAuftrag leseUndLoescheFortsetzenAuftrag() {
         Path file = fortsetzenDatei();
         if (!Files.isRegularFile(file)) {
-            return null;
+            // Ein Studio, das mitten im Start gestorben ist, hat den Auftrag in seiner
+            // Claim-Datei liegen lassen. Er gehoert dann wieder niemandem.
+            holeVerwaisteClaimsZurueck(file);
+            if (!Files.isRegularFile(file)) {
+                return null;
+            }
         }
 
         // Atomarer Claim: verschiebe fortsetzen.json in eine prozess-eigene Claim-Datei.
@@ -1567,13 +1673,6 @@ public class TestCaseComponent extends JPanel implements ActionListener {
 
         try {
             String content = Files.readString(claimFile, StandardCharsets.UTF_8).trim();
-            try {
-                Files.deleteIfExists(claimFile);
-            } catch (IOException e) {
-                Logger
-                    .getLogger(TestCaseComponent.class.getName())
-                    .log(Level.WARNING, "Konnte Claim-Datei nicht loeschen: " + e.getMessage());
-            }
             Object parsed = org.json.simple.JSONValue.parse(content);
             if (parsed instanceof org.json.simple.JSONObject) {
                 org.json.simple.JSONObject json = (org.json.simple.JSONObject) parsed;
@@ -1591,8 +1690,19 @@ public class TestCaseComponent extends JPanel implements ActionListener {
                 String belegsatzId = belegsatzIdObj instanceof String
                     ? (String) belegsatzIdObj
                     : "";
-                return new FortsetzAuftrag(tcId, belege, letzteUrl, teil, offset, belegsatzId);
+                return new FortsetzAuftrag(
+                    tcId,
+                    belege,
+                    letzteUrl,
+                    teil,
+                    offset,
+                    belegsatzId,
+                    claimFile,
+                    content
+                );
             }
+            // Unlesbarer Inhalt: nichts zum Fortsetzen, also auch nichts zu bewahren.
+            Files.deleteIfExists(claimFile);
         } catch (Exception ex) {
             try {
                 Files.deleteIfExists(claimFile);
@@ -1606,6 +1716,149 @@ public class TestCaseComponent extends JPanel implements ActionListener {
                 );
         }
         return null;
+    }
+
+    /** Die Aufnahme laeuft: der Auftrag ist erfuellt und die Claim-Datei kann weg. */
+    static void verbraucheFortsetzenAuftrag(FortsetzAuftrag auftrag) {
+        if (auftrag == null || auftrag.claimDatei == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(auftrag.claimDatei);
+        } catch (IOException e) {
+            Logger
+                .getLogger(TestCaseComponent.class.getName())
+                .log(Level.WARNING, "Konnte Claim-Datei nicht loeschen: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Die Aufnahme lief nicht: der Auftrag geht zurueck und bleibt offen.
+     *
+     * <p>Mit {@code grund} traegt die zurueckgeschriebene Datei ein Feld
+     * {@code startFehlgeschlagen}; daran erkennt das Panel, dass hier nicht ein Start
+     * laeuft, sondern einer gescheitert ist, und sagt es der Testerin.
+     *
+     * @return {@code true}, wenn der Auftrag wieder als {@code fortsetzen.json} liegt
+     */
+    static boolean gibFortsetzenAuftragZurueck(FortsetzAuftrag auftrag, String grund) {
+        if (auftrag == null || auftrag.claimDatei == null) {
+            return false;
+        }
+        if (!Files.exists(auftrag.claimDatei)) {
+            // Schon verbraucht oder schon zurueckgegeben — beides ist ein Endzustand.
+            return false;
+        }
+        Path ziel = fortsetzenDatei();
+        Path tmp = ziel.resolveSibling(
+            ziel.getFileName().toString() +
+            "." +
+            ProcessHandle.current().pid() +
+            "." +
+            System.nanoTime() +
+            ".rueck"
+        );
+        try {
+            if (Files.exists(ziel)) {
+                // Ein neuerer Auftrag liegt schon da; der zaehlt, nicht der alte.
+                Files.deleteIfExists(auftrag.claimDatei);
+                return false;
+            }
+            String inhalt = auftrag.rohJson;
+            if (grund != null && !grund.isBlank()) {
+                Object parsed = org.json.simple.JSONValue.parse(inhalt);
+                if (parsed instanceof org.json.simple.JSONObject) {
+                    org.json.simple.JSONObject json = (org.json.simple.JSONObject) parsed;
+                    json.put("startFehlgeschlagen", grund.trim());
+                    inhalt = json.toJSONString();
+                }
+            }
+            Files.writeString(tmp, inhalt, StandardCharsets.UTF_8);
+            Files.move(tmp, ziel, StandardCopyOption.ATOMIC_MOVE);
+            Files.deleteIfExists(auftrag.claimDatei);
+            return true;
+        } catch (Exception ex) {
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (Exception ignored) {}
+            Logger
+                .getLogger(TestCaseComponent.class.getName())
+                .log(
+                    Level.WARNING,
+                    "Konnte Fortsetz-Auftrag nicht zurueckgeben: " + ex.getMessage(),
+                    ex
+                );
+            return false;
+        }
+    }
+
+    /**
+     * Gibt Auftraege zurueck, deren Studio waehrend des Starts gestorben ist.
+     *
+     * <p>Die Claim-Datei traegt die PID ihres Prozesses. Lebt der nicht mehr, ist der
+     * Auftrag herrenlos — der juengste kommt zurueck, die aelteren gehen (die letzte
+     * Absicht gilt). Gleiche PID-Pruefung wie {@code AufnahmeErholung} im Plugin.
+     */
+    private static void holeVerwaisteClaimsZurueck(Path ziel) {
+        Path ordner = ziel.getParent();
+        if (ordner == null) {
+            return;
+        }
+        String praefix = ziel.getFileName().toString() + ".";
+        File[] kandidaten = ordner
+            .toFile()
+            .listFiles((dir, name) -> name.startsWith(praefix) && name.endsWith(".claim"));
+        if (kandidaten == null || kandidaten.length == 0) {
+            return;
+        }
+        File juengster = null;
+        List<File> tote = new ArrayList<>();
+        for (File claim : kandidaten) {
+            if (lebtBesitzerVonClaim(claim.getName(), praefix)) {
+                continue;
+            }
+            tote.add(claim);
+            if (juengster == null || claim.lastModified() > juengster.lastModified()) {
+                juengster = claim;
+            }
+        }
+        if (juengster == null) {
+            return;
+        }
+        try {
+            Files.move(juengster.toPath(), ziel, StandardCopyOption.ATOMIC_MOVE);
+            Logger
+                .getLogger(TestCaseComponent.class.getName())
+                .log(
+                    Level.INFO,
+                    "Fortsetz-Auftrag eines beendeten Studios zurueckgeholt: {0}",
+                    juengster.getName()
+                );
+        } catch (Exception ex) {
+            return;
+        }
+        for (File alt : tote) {
+            if (!alt.equals(juengster)) {
+                alt.delete();
+            }
+        }
+    }
+
+    /** {@code fortsetzen.json.<pid>.<nanos>.claim} — lebt der Prozess mit dieser PID noch? */
+    private static boolean lebtBesitzerVonClaim(String claimName, String praefix) {
+        String rest = claimName.substring(praefix.length());
+        int punkt = rest.indexOf('.');
+        String pidText = punkt > 0 ? rest.substring(0, punkt) : rest;
+        try {
+            long pid = Long.parseLong(pidText);
+            if (pid == ProcessHandle.current().pid()) {
+                return true;
+            }
+            return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
+        } catch (NumberFormatException ex) {
+            // Kein erkennbarer Besitzer: nicht anfassen.
+            return true;
+        }
     }
 
     /**
