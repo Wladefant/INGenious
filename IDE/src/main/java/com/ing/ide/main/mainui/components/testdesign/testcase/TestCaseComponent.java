@@ -1185,6 +1185,32 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         String modus = resolveRecordingStartModus(projectLocation);
         File belege = belegOrdnerFuerAufnahme(outputFile);
 
+        FortsetzAuftrag fortsetzen = leseUndLoescheFortsetzenAuftrag();
+        if (fortsetzen != null) {
+            String targetName = liveRecordingTarget != null ? liveRecordingTarget.getName() : "";
+            if (fortsetzen.passtZuTestfall(targetName)) {
+                if (fortsetzen.belegeOrdner != null && !fortsetzen.belegeOrdner.isBlank()) {
+                    File alterOrdner = new File(fortsetzen.belegeOrdner);
+                    if (alterOrdner.isDirectory() || alterOrdner.mkdirs()) {
+                        belege = alterOrdner;
+                    }
+                }
+                modus = "letzteSeite";
+                if (fortsetzen.letzteUrl != null && !fortsetzen.letzteUrl.isBlank()) {
+                    startUrl = fortsetzen.letzteUrl.trim();
+                }
+            } else {
+                logPlaywright(
+                    "Fortsetzen-Auftrag verworfen: Testfall \"" +
+                    fortsetzen.testCaseId +
+                    "\" passt nicht zum Ziel \"" +
+                    targetName +
+                    "\". Starte reguläre Aufnahme."
+                );
+                fortsetzen = null;
+            }
+        }
+
         List<String> command = new ArrayList<>();
         command.add("node");
         command.add(werkzeug.getAbsolutePath());
@@ -1219,23 +1245,41 @@ public class TestCaseComponent extends JPanel implements ActionListener {
             command.add("--start-url");
             command.add(startUrl.trim());
         }
+        if (fortsetzen != null) {
+            command.add("--teil");
+            command.add(String.valueOf(fortsetzen.teil));
+            command.add("--schritt-offset");
+            command.add(String.valueOf(fortsetzen.schrittOffset));
+        }
         // Drei Lagen, drei Sätze. Vorher stand hier in allen Fällen „die Aufnahme beginnt bei
         // der Start-Adresse." — auch dann, wenn das Projekt gar keine hinterlegt hat und
         // resolveRecordingStartUrl deshalb null lieferte. Ein Protokoll, das etwas behauptet,
         // was nicht passiert, kostet bei der nächsten Diagnose mehr als es hier spart.
-        logPlaywright(
-            "Dauerbrowser: " +
-            (
-                DAUERBROWSER_WEITER.equals(modus)
-                    ? "die Aufnahme läuft dort weiter, wo der Browser gerade steht."
-                    : hatStartUrl
-                        ? "derselbe Aufnahme-Tab geht auf die Start-Adresse zurück (" +
-                        startUrl.trim() +
-                        ") — die Anmeldung bleibt erhalten."
-                        : "für dieses Projekt ist keine Start-Adresse hinterlegt; die Aufnahme " +
-                        "beginnt dort, wo der Browser gerade steht."
-            )
-        );
+        if (fortsetzen != null) {
+            logPlaywright(
+                "Dauerbrowser: Fortsetzen von Teil " +
+                fortsetzen.teil +
+                " in Belegordner " +
+                belege.getAbsolutePath() +
+                " ab Schritt " +
+                (fortsetzen.schrittOffset + 1) +
+                (hatStartUrl ? " auf " + startUrl.trim() : ".")
+            );
+        } else {
+            logPlaywright(
+                "Dauerbrowser: " +
+                (
+                    DAUERBROWSER_WEITER.equals(modus)
+                        ? "die Aufnahme läuft dort weiter, wo der Browser gerade steht."
+                        : hatStartUrl
+                            ? "derselbe Aufnahme-Tab geht auf die Start-Adresse zurück (" +
+                            startUrl.trim() +
+                            ") — die Anmeldung bleibt erhalten."
+                            : "für dieses Projekt ist keine Start-Adresse hinterlegt; die Aufnahme " +
+                            "beginnt dort, wo der Browser gerade steht."
+                )
+            );
+        }
         logPlaywright("Belege: " + belege.getAbsolutePath());
 
         Process process;
@@ -1428,6 +1472,119 @@ public class TestCaseComponent extends JPanel implements ActionListener {
             if (kandidat.isFile()) {
                 return kandidat;
             }
+        }
+        return null;
+    }
+
+    static class FortsetzAuftrag {
+        final String testCaseId;
+        final String belegeOrdner;
+        final String letzteUrl;
+        final int teil;
+        final int schrittOffset;
+        final String belegsatzId;
+
+        FortsetzAuftrag(
+            String testCaseId,
+            String belegeOrdner,
+            String letzteUrl,
+            int teil,
+            int schrittOffset,
+            String belegsatzId
+        ) {
+            this.testCaseId = testCaseId == null ? "" : testCaseId.trim();
+            this.belegeOrdner = belegeOrdner == null ? "" : belegeOrdner.trim();
+            this.letzteUrl = letzteUrl == null ? "" : letzteUrl.trim();
+            this.teil = teil > 0 ? teil : 1;
+            this.schrittOffset = Math.max(0, schrittOffset);
+            this.belegsatzId = belegsatzId == null ? "" : belegsatzId.trim();
+        }
+
+        boolean passtZuTestfall(String targetName) {
+            if (testCaseId.isBlank()) return true;
+            if (targetName == null || targetName.isBlank()) return true;
+            String t = targetName.trim();
+            if (t.equals(testCaseId) || t.contains(testCaseId)) return true;
+            String fallIdTarget = fallId(t);
+            String fallIdAuftrag = fallId(testCaseId);
+            return !fallIdTarget.isBlank() && fallIdTarget.equals(fallIdAuftrag);
+        }
+
+        private static String fallId(String name) {
+            java.util.regex.Matcher m = java
+                .util.regex.Pattern.compile(
+                    "^(?:TC[-_]?)?(\\d+)(?:\\s+-\\s+.*)?$",
+                    java.util.regex.Pattern.CASE_INSENSITIVE
+                )
+                .matcher(name.trim());
+            return m.matches() ? m.group(1) : "";
+        }
+    }
+
+    static Path fortsetzenDatei() {
+        String propFile = System.getProperty("ING_QA_FORTSETZEN_DATEI");
+        if (propFile == null || propFile.isBlank()) {
+            propFile = System.getProperty("ing.qa.fortsetzen.datei");
+        }
+        String envFile = System.getenv("ING_QA_FORTSETZEN_DATEI");
+        String local = System.getenv("LOCALAPPDATA");
+        if (propFile != null && !propFile.isBlank()) {
+            return Path.of(propFile.trim());
+        } else if (envFile != null && !envFile.isBlank()) {
+            return Path.of(envFile.trim());
+        } else if (local != null && !local.isBlank()) {
+            return Path.of(local.trim(), "IngQaAutopilot", "fortsetzen.json");
+        } else {
+            return Path.of(
+                System.getProperty("user.home", "."),
+                ".IngQaAutopilot",
+                "fortsetzen.json"
+            );
+        }
+    }
+
+    static FortsetzAuftrag leseUndLoescheFortsetzenAuftrag() {
+        Path file = fortsetzenDatei();
+        if (!Files.isRegularFile(file)) {
+            return null;
+        }
+        try {
+            String content = Files.readString(file, StandardCharsets.UTF_8).trim();
+            try {
+                Files.deleteIfExists(file);
+            } catch (IOException e) {
+                Logger
+                    .getLogger(TestCaseComponent.class.getName())
+                    .log(Level.WARNING, "Konnte fortsetzen.json nicht loeschen: " + e.getMessage());
+            }
+
+            Object parsed = org.json.simple.JSONValue.parse(content);
+            if (parsed instanceof org.json.simple.JSONObject) {
+                org.json.simple.JSONObject json = (org.json.simple.JSONObject) parsed;
+                Object tcIdObj = json.get("testCaseId");
+                String tcId = tcIdObj instanceof String ? (String) tcIdObj : "";
+                Object belegeObj = json.get("belegeOrdner");
+                String belege = belegeObj instanceof String ? (String) belegeObj : "";
+                Object letzteUrlObj = json.get("letzteUrl");
+                String letzteUrl = letzteUrlObj instanceof String ? (String) letzteUrlObj : "";
+                Object teilObj = json.get("teil");
+                int teil = teilObj instanceof Number ? ((Number) teilObj).intValue() : 1;
+                Object offsetObj = json.get("schrittOffset");
+                int offset = offsetObj instanceof Number ? ((Number) offsetObj).intValue() : 0;
+                Object belegsatzIdObj = json.get("belegsatzId");
+                String belegsatzId = belegsatzIdObj instanceof String
+                    ? (String) belegsatzIdObj
+                    : "";
+                return new FortsetzAuftrag(tcId, belege, letzteUrl, teil, offset, belegsatzId);
+            }
+        } catch (Exception ex) {
+            Logger
+                .getLogger(TestCaseComponent.class.getName())
+                .log(
+                    Level.WARNING,
+                    "Fehler beim Lesen von fortsetzen.json: " + ex.getMessage(),
+                    ex
+                );
         }
         return null;
     }
