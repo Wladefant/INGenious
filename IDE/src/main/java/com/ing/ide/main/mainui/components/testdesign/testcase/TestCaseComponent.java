@@ -1501,10 +1501,13 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         }
 
         boolean passtZuTestfall(String targetName) {
-            if (testCaseId.isBlank()) return true;
-            if (targetName == null || targetName.isBlank()) return true;
+            if (testCaseId.isBlank() || targetName == null || targetName.isBlank()) {
+                return false;
+            }
             String t = targetName.trim();
-            if (t.equals(testCaseId) || t.contains(testCaseId)) return true;
+            if (t.equals(testCaseId)) {
+                return true;
+            }
             String fallIdTarget = fallId(t);
             String fallIdAuftrag = fallId(testCaseId);
             return !fallIdTarget.isBlank() && fallIdTarget.equals(fallIdAuftrag);
@@ -1548,16 +1551,29 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         if (!Files.isRegularFile(file)) {
             return null;
         }
+
+        // Atomarer Claim: verschiebe fortsetzen.json in eine prozess-eigene Claim-Datei.
+        // Nur wenn das atomare Umbenennen gelingt, gehoert der Auftrag diesem Prozess.
+        // Verhindert Replay und Race-Conditions zwischen mehreren Studio-Instanzen.
+        long pid = ProcessHandle.current().pid();
+        Path claimFile = file.resolveSibling(
+            file.getFileName().toString() + "." + pid + "." + System.nanoTime() + ".claim"
+        );
         try {
-            String content = Files.readString(file, StandardCharsets.UTF_8).trim();
+            Files.move(file, claimFile, StandardCopyOption.ATOMIC_MOVE);
+        } catch (Exception e) {
+            return null;
+        }
+
+        try {
+            String content = Files.readString(claimFile, StandardCharsets.UTF_8).trim();
             try {
-                Files.deleteIfExists(file);
+                Files.deleteIfExists(claimFile);
             } catch (IOException e) {
                 Logger
                     .getLogger(TestCaseComponent.class.getName())
-                    .log(Level.WARNING, "Konnte fortsetzen.json nicht loeschen: " + e.getMessage());
+                    .log(Level.WARNING, "Konnte Claim-Datei nicht loeschen: " + e.getMessage());
             }
-
             Object parsed = org.json.simple.JSONValue.parse(content);
             if (parsed instanceof org.json.simple.JSONObject) {
                 org.json.simple.JSONObject json = (org.json.simple.JSONObject) parsed;
@@ -1578,6 +1594,9 @@ public class TestCaseComponent extends JPanel implements ActionListener {
                 return new FortsetzAuftrag(tcId, belege, letzteUrl, teil, offset, belegsatzId);
             }
         } catch (Exception ex) {
+            try {
+                Files.deleteIfExists(claimFile);
+            } catch (Exception ignored) {}
             Logger
                 .getLogger(TestCaseComponent.class.getName())
                 .log(
