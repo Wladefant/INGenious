@@ -16,6 +16,7 @@ import com.ing.datalib.testdata.model.GlobalDataModel;
 import com.ing.datalib.testdata.model.TestDataModel;
 import com.ing.datalib.util.data.FileScanner;
 import com.ing.engine.core.TMIntegration;
+import com.ing.ide.main.Beenden;
 import com.ing.ide.main.Main;
 import com.ing.ide.main.dashboard.server.DashBoardManager;
 import com.ing.ide.main.fx.FXDashBoard;
@@ -206,16 +207,35 @@ public class AppMainFrame extends JFrame {
 
                 @Override
                 public void windowClosing(WindowEvent we) {
-                    if (iCanQuit()) {
+                    if (!iCanQuit()) {
+                        return;
+                    }
+                    try {
                         // Close StoryWriter editor if open
                         if (sActionListener != null) {
                             sActionListener.closeBddEditorIfOpen();
                         }
-                        setDefaultCloseOperation(AppMainFrame.EXIT_ON_CLOSE);
                         if (quitType == QUIT_TYPE.RESTART) {
                             doRestart();
                         }
                         dispose();
+                    } catch (Throwable aufraeumen) {
+                        // Ein gescheitertes Aufraeumen darf das Beenden nicht verhindern - genau
+                        // dieser Fall liess bisher ein kopfloses javaw zurueck (#677).
+                        Logger
+                            .getLogger(AppMainFrame.class.getName())
+                            .log(
+                                Level.WARNING,
+                                "Aufraeumen beim Beenden fehlgeschlagen",
+                                aufraeumen
+                            );
+                    } finally {
+                        // Der Prozess endet HIER, nicht in JFrame.processWindowEvent: dessen
+                        // System.exit(0) haengt an EXIT_ON_CLOSE, laeuft nur, wenn kein
+                        // WindowListener zuvor geworfen hat, und wartet dann unbegrenzt auf die
+                        // Abschluss-Haken. Das Fenster bleibt darum auf DO_NOTHING_ON_CLOSE
+                        // (Main.launchUI), und Beenden ist der einzige Ausgang.
+                        Beenden.jetzt();
                     }
                 }
             }
