@@ -70,7 +70,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -2304,18 +2306,44 @@ public class TestCaseComponent extends JPanel implements ActionListener {
                 if (!value.isEmpty()) {
                     return value;
                 }
-                List<String> keys = extractKeysFromJson(content);
-                if (!keys.isEmpty() && (key != null && !key.isEmpty())) {
-                    String msg =
-                        "Browser-Wahl: Kein Eintrag für Projektschlüssel \"" +
-                        key +
-                        "\" in " +
-                        file +
-                        " gefunden. Vorhandene Schlüssel: " +
-                        keys +
-                        ".";
-                    System.out.println(msg);
-                    Logger.getLogger(TestCaseComponent.class.getName()).log(Level.INFO, msg);
+                if (key != null && !key.isEmpty()) {
+                    List<String> keys = extractKeysFromJson(content);
+                    String uebernommen = wahlAusGleichnamigemProjekt(keys, key, content);
+                    if (!uebernommen.isEmpty()) {
+                        meldeEinmal(
+                            key,
+                            "Browser-Wahl: Für Projektschlüssel \"" +
+                            key +
+                            "\" steht in " +
+                            file +
+                            " keine Wahl; übernommen wird \"" +
+                            uebernommen +
+                            "\" von einem gleichnamigen Projekt."
+                        );
+                        return uebernommen;
+                    }
+                    if (keys.contains(key)) {
+                        meldeEinmal(
+                            key,
+                            "Browser-Wahl: Der Eintrag für Projektschlüssel \"" +
+                            key +
+                            "\" in " +
+                            file +
+                            " ist leer — es wurde noch kein Browser gewählt. " +
+                            "Aufgenommen wird mit dem mitgelieferten Chromium."
+                        );
+                    } else if (!keys.isEmpty()) {
+                        meldeEinmal(
+                            key,
+                            "Browser-Wahl: Kein Eintrag für Projektschlüssel \"" +
+                            key +
+                            "\" in " +
+                            file +
+                            " gefunden. Vorhandene Schlüssel: " +
+                            keys +
+                            "."
+                        );
+                    }
                 }
             }
         } catch (IOException | RuntimeException ex) {
@@ -2323,6 +2351,64 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         }
         return "";
     }
+
+    /**
+     * Die Wahl eines gleichnamigen Projekts, wenn für diesen Schlüssel keine gespeichert ist.
+     *
+     * <p>Ein Wechsel des Installationsverzeichnisses ändert den Projektschlüssel, nicht das
+     * Projekt: derselbe {@code Calimero} lag erst unter {@code nachweis-ziel}, dann unter
+     * {@code ING-Testautomatisierung}. Beide Zeilen stehen in derselben Datei, und ohne diese
+     * Übernahme nimmt die neue Installation mit Chromium auf, obwohl zwei Zeilen darüber
+     * {@code chrome} steht. Verglichen wird der letzte Pfadabschnitt.
+     *
+     * @return die übernommene Marke, oder {@code ""} wenn es keine gleichnamige gibt
+     */
+    static String wahlAusGleichnamigemProjekt(List<String> keys, String projectKey, String json) {
+        if (keys == null || projectKey == null) {
+            return "";
+        }
+        String name = projektName(projectKey);
+        if (name.isEmpty()) {
+            return "";
+        }
+        for (String fremd : keys) {
+            if (fremd == null || fremd.equals(projectKey) || !name.equals(projektName(fremd))) {
+                continue;
+            }
+            String wert = extractBrowserFromJson(json, fremd);
+            if (!wert.isEmpty()) {
+                return wert;
+            }
+        }
+        return "";
+    }
+
+    /** Der letzte Pfadabschnitt eines Projektschlüssels, z. B. {@code Calimero}. */
+    static String projektName(String projectKey) {
+        String k = projectKey == null ? "" : projectKey.trim().replace("\\", "/");
+        while (k.endsWith("/")) {
+            k = k.substring(0, k.length() - 1);
+        }
+        int slash = k.lastIndexOf('/');
+        return slash < 0 ? k : k.substring(slash + 1);
+    }
+
+    /**
+     * Sagt einen Satz zur Browser-Wahl genau einmal je Projektschlüssel.
+     *
+     * <p>{@link #readRememberedBrowser} wird pro Aufnahmestart mehrfach gefragt, und bis zum
+     * 16.09.2026 stand dieselbe Zeile deshalb doppelt und dreifach im Protokoll — laut genug,
+     * um wie ein Fehler zu wirken, und zu oft, um gelesen zu werden.
+     */
+    private static void meldeEinmal(String projectKey, String msg) {
+        if (!BROWSER_WAHL_GEMELDET.add(projectKey + "|" + msg)) {
+            return;
+        }
+        System.out.println(msg);
+        Logger.getLogger(TestCaseComponent.class.getName()).log(Level.INFO, msg);
+    }
+
+    private static final Set<String> BROWSER_WAHL_GEMELDET = ConcurrentHashMap.newKeySet();
 
     public static List<String> extractKeysFromJson(String json) {
         List<String> keys = new ArrayList<>();
