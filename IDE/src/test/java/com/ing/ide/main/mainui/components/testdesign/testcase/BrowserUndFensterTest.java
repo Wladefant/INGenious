@@ -156,6 +156,118 @@ public class BrowserUndFensterTest {
         }
     }
 
+    /**
+     * The 16.09.2026 recurring defect: the tester had to pick a browser on every Studio
+     * start, and the log lied about why.
+     *
+     * <p>On the laptop the key of the new installation held an <em>empty</em> value while the
+     * old one held {@code "chrome"} — and {@link TestCaseComponent#readRememberedBrowser}
+     * reported "Kein Eintrag" for a key it printed in its own "Vorhandene Schluessel" list.
+     * Present-but-empty and absent are two different states; only the first one means
+     * "nobody has chosen here yet".
+     */
+    @Test
+    public void emptyEntryIsTreatedAsNoChoiceNotAsMissingEntry() throws IOException {
+        Path tempFile = Files.createTempFile("browser-leer-test-", ".json");
+        String prev = System.getProperty("ING_QA_BROWSER_DATEI");
+        try {
+            // Exactly the laptop state of 15.09.2026, minus the same-named sibling project.
+            String json = "{\n" + "  \"C:/Projects/Calimero\": \"\"\n" + "}";
+            Files.writeString(tempFile, json, StandardCharsets.UTF_8);
+            System.setProperty("ING_QA_BROWSER_DATEI", tempFile.toString());
+
+            assertEquals(TestCaseComponent.readRememberedBrowser("C:/Projects/Calimero"), "");
+            assertEquals(TestCaseComponent.readRememberedBrowser("C:\\Projects\\Calimero"), "");
+            // The empty entry is present — that is what separates it from a missing one.
+            assertTrue(
+                TestCaseComponent.extractKeysFromJson(json).contains("C:/Projects/Calimero")
+            );
+            assertFalse(
+                TestCaseComponent.extractKeysFromJson(json).contains("C:/Projects/Banking")
+            );
+        } finally {
+            if (prev != null) {
+                System.setProperty("ING_QA_BROWSER_DATEI", prev);
+            } else {
+                System.clearProperty("ING_QA_BROWSER_DATEI");
+            }
+            Files.deleteIfExists(tempFile);
+        }
+    }
+
+    /**
+     * Changing the installation directory changes the project key, not the project: the same
+     * {@code Calimero} first lived under {@code nachweis-ziel}, then under
+     * {@code ING-Testautomatisierung}. Both lines sit in the same file, so the existing
+     * choice is adopted instead of recording with Chromium.
+     */
+    @Test
+    public void adoptsChoiceFromSameNamedProject() throws IOException {
+        Path tempFile = Files.createTempFile("browser-uebernahme-test-", ".json");
+        String prev = System.getProperty("ING_QA_BROWSER_DATEI");
+        String alt = "C:/Users/PC28GR/nachweis-ziel/studio/Projects/Calimero";
+        String neu =
+            "C:/Users/PC28GR/AppData/Local/ING-Testautomatisierung/studio/Projects/Calimero";
+        try {
+            // The laptop's file verbatim, as of 15.09.2026 10:52.
+            String json =
+                "{\n" + "  \"" + alt + "\": \"chrome\",\n" + "  \"" + neu + "\": \"\"\n" + "}";
+            Files.writeString(tempFile, json, StandardCharsets.UTF_8);
+            System.setProperty("ING_QA_BROWSER_DATEI", tempFile.toString());
+
+            assertEquals(TestCaseComponent.readRememberedBrowser(neu), "chrome");
+            assertEquals(TestCaseComponent.readRememberedBrowser(alt), "chrome");
+            assertEquals(
+                TestCaseComponent.browserChannelArgs(TestCaseComponent.readRememberedBrowser(neu)),
+                " --channel chrome"
+            );
+        } finally {
+            if (prev != null) {
+                System.setProperty("ING_QA_BROWSER_DATEI", prev);
+            } else {
+                System.clearProperty("ING_QA_BROWSER_DATEI");
+            }
+            Files.deleteIfExists(tempFile);
+        }
+    }
+
+    @Test
+    public void doesNotAdoptChoiceFromDifferentlyNamedProject() throws IOException {
+        Path tempFile = Files.createTempFile("browser-fremd-test-", ".json");
+        String prev = System.getProperty("ING_QA_BROWSER_DATEI");
+        try {
+            String json =
+                "{\n" +
+                "  \"C:/alt/studio/Projects/Banking\": \"msedge\",\n" +
+                "  \"C:/neu/studio/Projects/Calimero\": \"\"\n" +
+                "}";
+            Files.writeString(tempFile, json, StandardCharsets.UTF_8);
+            System.setProperty("ING_QA_BROWSER_DATEI", tempFile.toString());
+
+            assertEquals(
+                TestCaseComponent.readRememberedBrowser("C:/neu/studio/Projects/Calimero"),
+                ""
+            );
+        } finally {
+            if (prev != null) {
+                System.setProperty("ING_QA_BROWSER_DATEI", prev);
+            } else {
+                System.clearProperty("ING_QA_BROWSER_DATEI");
+            }
+            Files.deleteIfExists(tempFile);
+        }
+    }
+
+    @Test
+    public void projektNameReturnsLastPathSegment() {
+        assertEquals(TestCaseComponent.projektName("C:/neu/studio/Projects/Calimero"), "Calimero");
+        assertEquals(TestCaseComponent.projektName("C:\\alt\\Projects\\Calimero"), "Calimero");
+        assertEquals(TestCaseComponent.projektName("C:/alt/Projects/Calimero/"), "Calimero");
+        assertEquals(TestCaseComponent.projektName("ohne-projekt"), "ohne-projekt");
+        assertEquals(TestCaseComponent.projektName(""), "");
+        assertEquals(TestCaseComponent.projektName(null), "");
+    }
+
     @Test
     public void resolveRecordingStartModusMatchesAcrossSlashVariations() throws IOException {
         Path tempFile = Files.createTempFile("aufnahme-start-test-", ".json");
