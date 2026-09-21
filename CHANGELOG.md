@@ -15,6 +15,7 @@ Release Date: <insert date of release>
 #### Deprecated
 #### Removed
 #### Fixed
+- Fixed recording-start console deadlock by confining Swing setup and console layout to the EDT while recorder launch and process shutdown remain in the background ([852](https://github.com/Wladefant/ing-qa-automation/issues/852)).
 - Fixed incorrect cell deletion mapping in Test Datasheet data columns to ensure correct cell references is removed
 - Fixed an issue where adding a new column in the Test Datasheet's user-defined data columns could incorrectly disable an unrelated column (most often the third column)
 - Fixed migration issue on Test Data scope field not persisting on first migrate
