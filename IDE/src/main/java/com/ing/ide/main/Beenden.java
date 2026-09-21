@@ -55,6 +55,11 @@ public final class Beenden {
         if (!ANGEFORDERT.compareAndSet(false, true)) {
             return;
         }
+        try {
+            javafx.application.Platform.exit();
+        } catch (Throwable ignored) {
+            // JavaFX might not be initialized or present
+        }
         Thread wachhund = new Thread(Beenden::stecker, "ing-beenden-wachhund");
         // Daemon: der Wachhund darf niemals selbst der Grund sein, dass die JVM weiterlaeuft.
         wachhund.setDaemon(true);

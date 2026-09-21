@@ -58,7 +58,7 @@ public class FXStartUp extends JDialog {
     private Label errorLabel;
 
     public FXStartUp(AppMainFrame sMainFrame) {
-        super(new JFrame());
+        super(sMainFrame != null ? sMainFrame : new JFrame());
         this.sMainFrame = sMainFrame;
         setModal(true);
         setTitle("INGenious Playwright Studio");

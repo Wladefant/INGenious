@@ -38,7 +38,7 @@ public class StartUp extends javax.swing.JDialog {
     private Boolean recentChanged = false;
 
     public StartUp(AppMainFrame sMainFrame) {
-        super(new JFrame());
+        super(sMainFrame != null ? sMainFrame : new JFrame());
         this.sMainFrame = sMainFrame;
         initComponents();
         AppIcon.applyTo(this);

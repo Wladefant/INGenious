@@ -1042,6 +1042,15 @@ public class AppMainFrame extends JFrame {
     }
 
     private Boolean iCanQuit(int optionType) {
+        Object vetoHook = getRootPane() != null
+            ? getRootPane().getClientProperty("ing.close.veto")
+            : null;
+        if (vetoHook instanceof java.util.function.BooleanSupplier) {
+            java.util.function.BooleanSupplier veto = (java.util.function.BooleanSupplier) vetoHook;
+            if (!veto.getAsBoolean()) {
+                return false;
+            }
+        }
         int option = JOptionPane.YES_OPTION;
         if (sProject != null) {
             // Use styled quit confirmation dialog
