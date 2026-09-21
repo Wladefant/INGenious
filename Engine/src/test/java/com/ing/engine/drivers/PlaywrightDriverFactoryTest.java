@@ -349,4 +349,53 @@ public class PlaywrightDriverFactoryTest {
         m.setAccessible(true);
         m.invoke(null, opts, value);
     }
+    @Test
+    public void testTakeUserDataDirWithoutEqualsDoesNotThrow() throws Exception {
+        Method m = PlaywrightDriverFactory.class.getDeclaredMethod("takeUserDataDir", List.class);
+        m.setAccessible(true);
+        List<String> caps = new ArrayList<>(Arrays.asList("setUserDataDir", "unrelated=val"));
+        String dir = (String) m.invoke(null, caps);
+        assertThat(dir).isEmpty();
+        assertThat(caps).containsExactly("unrelated=val");
+    }
+
+    @Test
+    public void testTakeUserDataDirWithValidPath() throws Exception {
+        Method m = PlaywrightDriverFactory.class.getDeclaredMethod("takeUserDataDir", List.class);
+        m.setAccessible(true);
+        List<String> caps = new ArrayList<>(Arrays.asList("setUserDataDir=C:\\profile", "other=1"));
+        String dir = (String) m.invoke(null, caps);
+        assertThat(dir).isEqualTo("C:\\profile");
+        assertThat(caps).containsExactly("other=1");
+    }
+
+    @Test
+    public void testAddLaunchOptionsCapabilityWithoutEqualsDoesNotThrow() throws Exception {
+        Method m = PlaywrightDriverFactory.class.getDeclaredMethod("addLaunchOptions",
+            com.microsoft.playwright.BrowserType.LaunchOptions.class, List.class);
+        m.setAccessible(true);
+        com.microsoft.playwright.BrowserType.LaunchOptions opts = new com.microsoft.playwright.BrowserType.LaunchOptions();
+        List<String> caps = Arrays.asList("setheadless", "setchannel=chrome");
+        com.microsoft.playwright.BrowserType.LaunchOptions res =
+            (com.microsoft.playwright.BrowserType.LaunchOptions) m.invoke(null, opts, caps);
+        assertThat(res).isNotNull();
+        assertThat(res.channel).isEqualTo("chrome");
+    }
+
+    public static class SourceDummy {
+        public String headless = "not_a_boolean";
+    }
+
+    @Test
+    public void testCopyOptionsByNameTypeMismatchLogsWarningAndDoesNotThrow() throws Exception {
+        Method m = PlaywrightDriverFactory.class.getDeclaredMethod("copyOptionsByName",
+            Object.class, com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions.class);
+        m.setAccessible(true);
+        com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions target =
+            new com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions();
+        SourceDummy source = new SourceDummy();
+        // headless is Boolean in LaunchPersistentContextOptions, String in SourceDummy
+        m.invoke(null, source, target);
+        assertThat(target.headless).isNull();
+    }
 }
