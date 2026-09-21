@@ -62,6 +62,10 @@ public class ConsolePanel extends JPanel {
     }
 
     public void start() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::start);
+            return;
+        }
         clear();
         MessageConsole messageConsole = new MessageConsole(consoleView, true);
         messageConsole.redirectOut();

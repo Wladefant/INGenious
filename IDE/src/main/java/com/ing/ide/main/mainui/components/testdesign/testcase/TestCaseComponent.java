@@ -757,8 +757,44 @@ public class TestCaseComponent extends JPanel implements ActionListener {
     }
 
     public void record() throws IOException {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            // Serialize UI setup with console document edits; never pack from a recorder worker.
+            java.util.concurrent.FutureTask<Boolean> setup = new java.util.concurrent.FutureTask<>(
+                () -> {
+                    if (toolBar.isRecording()) {
+                        return true;
+                    }
+                    record();
+                    return false;
+                }
+            );
+            SwingUtilities.invokeLater(setup);
+            try {
+                if (setup.get()) {
+                    // Preserve synchronous stop for background callers without blocking the EDT.
+                    stopPlaywrightRecording();
+                }
+            } catch (InterruptedException ex) {
+                setup.cancel(false);
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while preparing recording", ex);
+            } catch (java.util.concurrent.ExecutionException ex) {
+                Throwable cause = ex.getCause();
+                if (cause instanceof IOException) {
+                    throw (IOException) cause;
+                }
+                if (cause instanceof RuntimeException) {
+                    throw (RuntimeException) cause;
+                }
+                if (cause instanceof Error) {
+                    throw (Error) cause;
+                }
+                throw new IOException("Unable to prepare recording", cause);
+            }
+            return;
+        }
         if (toolBar.isRecording()) {
-            stopPlaywrightRecording();
+            CompletableFuture.runAsync(this::stopPlaywrightRecording);
             return;
         }
 
@@ -836,7 +872,6 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         liveRecordingParser =
             new LiveRecordingParser(baseParser, target, firstInsertIndex, reference, objectPage);
 
-        liveRecordingOutputFile = prepareLiveRecordingOutputFile();
         final String startUrl = resolveRecordingStartUrl(pluginTarget);
         final String projectLocation = testDesign != null && testDesign.getProject() != null
             ? testDesign.getProject().getLocation()
@@ -871,12 +906,12 @@ public class TestCaseComponent extends JPanel implements ActionListener {
             "============================== Playwright Log Started =============================="
         );
 
-        startLiveRecordingWatcher();
-
         launchPlaywrightTask =
             CompletableFuture.runAsync(
                 () -> {
                     try {
+                        liveRecordingOutputFile = prepareLiveRecordingOutputFile();
+                        startLiveRecordingWatcher();
                         launchPlaywright(liveRecordingOutputFile, startUrl);
                     } catch (IOException ex) {
                         logPlaywrightError("Error launching Playwright: " + ex.getMessage());
@@ -3701,6 +3736,10 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         }
 
         public void showConsole() {
+            if (!SwingUtilities.isEventDispatchThread()) {
+                SwingUtilities.invokeLater(this::showConsole);
+                return;
+            }
             if (!isVisible()) {
                 pack();
                 setSize(690, 400);
