@@ -172,9 +172,17 @@ public class PlaywrightDriverFactory {
         Iterator<String> remaining = caps.iterator();
         while (remaining.hasNext()) {
             String cap = remaining.next();
-            String key = cap.split("=", 2)[0];
+            if (cap == null) {
+                continue;
+            }
+            String[] parts = cap.split("=", 2);
+            String key = parts[0];
             if (key.toLowerCase().contains("setuserdatadir")) {
-                userDataDir = cap.split("=", 2)[1].trim();
+                if (parts.length > 1) {
+                    userDataDir = parts[1].trim();
+                } else {
+                    LOGGER.warning("Capability '" + cap + "' contains no value for setUserDataDir");
+                }
                 remaining.remove();
             }
         }
@@ -219,6 +227,16 @@ public class PlaywrightDriverFactory {
                 Field targetField = target.getClass().getField(sourceField.getName());
                 if (targetField.getType().equals(sourceField.getType())) {
                     targetField.set(target, value);
+                } else {
+                    LOGGER.warning(
+                        "Option '" +
+                        sourceField.getName() +
+                        "' type mismatch between source (" +
+                        sourceField.getType().getName() +
+                        ") and target (" +
+                        targetField.getType().getName() +
+                        "); option dropped"
+                    );
                 }
             } catch (NoSuchFieldException | IllegalAccessException ex) {
                 LOGGER.fine(
@@ -241,9 +259,16 @@ public class PlaywrightDriverFactory {
 
         if (!caps.isEmpty()) {
             for (String cap : caps) {
-                String key = cap.split("=", 2)[0];
-                String value = cap.split("=", 2)[1];
-
+                if (cap == null) {
+                    continue;
+                }
+                String[] parts = cap.split("=", 2);
+                String key = parts[0];
+                if (parts.length < 2) {
+                    LOGGER.warning("Capability '" + cap + "' contains no '=' delimiter; skipped");
+                    continue;
+                }
+                String value = parts[1];
                 if (key.toLowerCase().contains("setheadless")) {
                     if (!value.trim().equals("")) launchOptions.setHeadless(
                         (boolean) getPropertyValueAsDesiredType(value)
@@ -338,8 +363,15 @@ public class PlaywrightDriverFactory {
         List<String> contextOptions = getContextOptions("default", settings);
         if (!contextOptions.isEmpty()) {
             for (String prop : contextOptions) {
+                if (prop == null) {
+                    continue;
+                }
                 String[] keyValue = prop.split("=", 2);
                 String key = keyValue[0].toLowerCase();
+                if (keyValue.length < 2) {
+                    LOGGER.warning("Context option '" + prop + "' contains no '=' delimiter; skipped");
+                    continue;
+                }
                 String value = keyValue[1];
 
                 switch (key) {
@@ -423,8 +455,16 @@ public class PlaywrightDriverFactory {
 
         if (!caps.isEmpty()) {
             for (String cap : caps) {
-                String key = cap.split("=", 2)[0];
-                String value = cap.split("=", 2)[1];
+                if (cap == null) {
+                    continue;
+                }
+                String[] parts = cap.split("=", 2);
+                String key = parts[0];
+                if (parts.length < 2) {
+                    LOGGER.warning("Capability '" + cap + "' contains no '=' delimiter; skipped");
+                    continue;
+                }
+                String value = parts[1];
 
                 if (key.toLowerCase().contains("setchannel")) {
                     if (value.toLowerCase().contains("edge")) browserName =
