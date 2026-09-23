@@ -1,6 +1,7 @@
 package com.ing.ide.main.mainui.components.testdesign.testcase;
 
 import com.ing.engine.core.RunManager;
+import com.ing.engine.drivers.ChannelAvailability;
 import com.ing.engine.drivers.PlaywrightDriverFactory;
 import com.ing.ide.main.utils.SearchBox;
 import com.ing.ide.main.utils.Utils;
@@ -9,6 +10,7 @@ import java.awt.event.ItemEvent;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.logging.Logger;
 import javax.swing.AbstractButton;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
@@ -22,6 +24,8 @@ import javax.swing.UIManager;
  *
  */
 public class TestCaseToolBar extends JToolBar {
+    private static final Logger LOG = Logger.getLogger(TestCaseToolBar.class.getName());
+
     private final TestCaseComponent testCaseComp;
 
     private JButton saveButton;
@@ -132,10 +136,16 @@ public class TestCaseToolBar extends JToolBar {
     }
 
     void loadBrowsers(List<String> emulators) {
+        // Keep the tester's choice across a reload, then start the group afresh: the old
+        // items would otherwise stay in it and a browser no longer offered could stay selected.
+        String previous = getPreviouslySelectedBrowser();
         browsersMenu.removeAll();
+        browserSelectButtonGroup = new ButtonGroup();
 
-        // Add Playwright browsers first
-        List<String> browsers = PlaywrightDriverFactory.Browser.getValuesAsList();
+        // Add Playwright browsers first - only those this machine can start.
+        List<String> browsers = ChannelAvailability.offeredBrowsers(
+            PlaywrightDriverFactory.Browser.getValuesAsList()
+        );
         setBrowserListPopupMenu(browsers);
 
         // Extract SAP and add it with separator
@@ -153,7 +163,7 @@ public class TestCaseToolBar extends JToolBar {
             setBrowserListPopupMenu(emulatorsCopy);
         }
 
-        selectABrowser();
+        selectABrowser(previous);
     }
 
     String getSelectedBrowser() {
@@ -201,8 +211,8 @@ public class TestCaseToolBar extends JToolBar {
         return null;
     }
 
-    private void selectABrowser() {
-        String browser = getPreviouslySelectedBrowser();
+    private void selectABrowser(String previous) {
+        String browser = previous;
         if (browser == null) {
             browser = RunManager.getGlobalSettings().getBrowser();
         }
@@ -216,11 +226,21 @@ public class TestCaseToolBar extends JToolBar {
                     button.setSelected(true);
                 }
             }
-        } else {
-            browserSelectButtonGroup.setSelected(
-                browserSelectButtonGroup.getElements().nextElement().getModel(),
-                true
-            );
+        }
+        // Nothing chosen yet, or the chosen browser is not offered on this machine: the
+        // first entry (Chromium) is the one every run can start with.
+        if (browserSelectButtonGroup.getSelection() == null) {
+            Enumeration<AbstractButton> buttons = browserSelectButtonGroup.getElements();
+            if (buttons.hasMoreElements()) {
+                if (browser != null) {
+                    LOG.info(
+                        "Run menu: " +
+                        browser +
+                        " is not offered here; selecting the first browser instead."
+                    );
+                }
+                buttons.nextElement().setSelected(true);
+            }
         }
     }
 

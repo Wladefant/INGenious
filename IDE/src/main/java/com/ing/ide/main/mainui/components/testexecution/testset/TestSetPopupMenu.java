@@ -1,5 +1,6 @@
 package com.ing.ide.main.mainui.components.testexecution.testset;
 
+import com.ing.engine.drivers.ChannelAvailability;
 import com.ing.engine.drivers.PlaywrightDriverFactory;
 import com.ing.ide.main.utils.Utils;
 import com.ing.ide.main.utils.keys.Keystroke;
@@ -84,8 +85,10 @@ public class TestSetPopupMenu extends JPopupMenu {
     void loadBrowsers(List<String> emulators) {
         changeBrowser.removeAll();
 
-        // Add Playwright browsers first
-        loadBrowsersToMenu(PlaywrightDriverFactory.Browser.getValuesAsList());
+        // Add Playwright browsers first - only those this machine can start.
+        loadBrowsersToMenu(
+            ChannelAvailability.offeredBrowsers(PlaywrightDriverFactory.Browser.getValuesAsList())
+        );
 
         // Extract SAP and add it with separator
         List<String> emulatorsCopy = new ArrayList<>(emulators);

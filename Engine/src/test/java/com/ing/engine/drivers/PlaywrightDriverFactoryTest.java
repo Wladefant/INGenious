@@ -349,6 +349,7 @@ public class PlaywrightDriverFactoryTest {
         m.setAccessible(true);
         m.invoke(null, opts, value);
     }
+
     @Test
     public void testTakeUserDataDirWithoutEqualsDoesNotThrow() throws Exception {
         Method m = PlaywrightDriverFactory.class.getDeclaredMethod("takeUserDataDir", List.class);
@@ -371,13 +372,25 @@ public class PlaywrightDriverFactoryTest {
 
     @Test
     public void testAddLaunchOptionsCapabilityWithoutEqualsDoesNotThrow() throws Exception {
-        Method m = PlaywrightDriverFactory.class.getDeclaredMethod("addLaunchOptions",
-            com.microsoft.playwright.BrowserType.LaunchOptions.class, List.class);
+        Method m =
+            PlaywrightDriverFactory.class.getDeclaredMethod(
+                    "addLaunchOptions",
+                    com.microsoft.playwright.BrowserType.LaunchOptions.class,
+                    List.class
+                );
         m.setAccessible(true);
         com.microsoft.playwright.BrowserType.LaunchOptions opts = new com.microsoft.playwright.BrowserType.LaunchOptions();
         List<String> caps = Arrays.asList("setheadless", "setchannel=chrome");
-        com.microsoft.playwright.BrowserType.LaunchOptions res =
-            (com.microsoft.playwright.BrowserType.LaunchOptions) m.invoke(null, opts, caps);
+        // Whether Chrome is installed on the build machine must not decide this test;
+        // ChannelAvailabilityTest covers the channel check itself.
+        boolean windows = ChannelAvailability.windows;
+        ChannelAvailability.windows = false;
+        com.microsoft.playwright.BrowserType.LaunchOptions res;
+        try {
+            res = (com.microsoft.playwright.BrowserType.LaunchOptions) m.invoke(null, opts, caps);
+        } finally {
+            ChannelAvailability.windows = windows;
+        }
         assertThat(res).isNotNull();
         assertThat(res.channel).isEqualTo("chrome");
     }
@@ -388,11 +401,14 @@ public class PlaywrightDriverFactoryTest {
 
     @Test
     public void testCopyOptionsByNameTypeMismatchLogsWarningAndDoesNotThrow() throws Exception {
-        Method m = PlaywrightDriverFactory.class.getDeclaredMethod("copyOptionsByName",
-            Object.class, com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions.class);
+        Method m =
+            PlaywrightDriverFactory.class.getDeclaredMethod(
+                    "copyOptionsByName",
+                    Object.class,
+                    com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions.class
+                );
         m.setAccessible(true);
-        com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions target =
-            new com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions();
+        com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions target = new com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions();
         SourceDummy source = new SourceDummy();
         // headless is Boolean in LaunchPersistentContextOptions, String in SourceDummy
         m.invoke(null, source, target);

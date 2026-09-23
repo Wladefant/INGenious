@@ -7,6 +7,7 @@ import static com.ing.datalib.component.ExecutionStep.HEADERS.TestCase;
 import static com.ing.datalib.component.ExecutionStep.HEADERS.TestScenario;
 
 import com.ing.datalib.component.Project;
+import com.ing.engine.drivers.ChannelAvailability;
 import com.ing.engine.drivers.PlaywrightDriverFactory;
 import com.ing.ide.main.utils.Utils;
 import com.ing.ide.main.utils.table.autosuggest.AutoSuggest;
@@ -123,8 +124,10 @@ public class TestSetAutoSuggest {
     void loadBrowsers() {
         List<String> browsers = new ArrayList<>();
 
-        // Add Playwright browsers first
-        browsers.addAll(PlaywrightDriverFactory.Browser.getValuesAsList());
+        // Add Playwright browsers first - only those this machine can start.
+        browsers.addAll(
+            ChannelAvailability.offeredBrowsers(PlaywrightDriverFactory.Browser.getValuesAsList())
+        );
 
         // Extract SAP and add it next
         List<String> emulators = new ArrayList<>(

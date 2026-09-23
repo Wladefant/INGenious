@@ -278,9 +278,22 @@ public class PlaywrightDriverFactory {
                         (double) getPropertyValueAsDesiredType(value)
                     );
                 } else if (key.toLowerCase().contains("setchannel")) {
-                    if (!value.trim().equals("")) launchOptions.setChannel(
-                        (String) getPropertyValueAsDesiredType(value)
-                    );
+                    if (!value.trim().equals("")) {
+                        String channel = (String) getPropertyValueAsDesiredType(value);
+                        // A channel that cannot start here (not installed, or locked for
+                        // automation by company policy) would end the run before its first
+                        // step. The bundled Chromium is the browser that can: use it instead
+                        // and say so where the tester reads the run.
+                        String reason = ChannelAvailability.unusableReason(channel);
+                        if (reason == null) {
+                            launchOptions.setChannel(channel);
+                        } else {
+                            String message =
+                                reason + " Der Lauf nutzt stattdessen das mitgelieferte Chromium.";
+                            LOGGER.warning("setChannel=" + channel + " übersprungen: " + message);
+                            System.out.println(message);
+                        }
+                    }
                 } else if (key.toLowerCase().contains("setchromiumsandbox")) {
                     if (!value.trim().equals("")) launchOptions.setChromiumSandbox(
                         (boolean) getPropertyValueAsDesiredType(value)
@@ -369,7 +382,9 @@ public class PlaywrightDriverFactory {
                 String[] keyValue = prop.split("=", 2);
                 String key = keyValue[0].toLowerCase();
                 if (keyValue.length < 2) {
-                    LOGGER.warning("Context option '" + prop + "' contains no '=' delimiter; skipped");
+                    LOGGER.warning(
+                        "Context option '" + prop + "' contains no '=' delimiter; skipped"
+                    );
                     continue;
                 }
                 String value = keyValue[1];
