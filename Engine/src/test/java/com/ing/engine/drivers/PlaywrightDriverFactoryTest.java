@@ -376,8 +376,16 @@ public class PlaywrightDriverFactoryTest {
         m.setAccessible(true);
         com.microsoft.playwright.BrowserType.LaunchOptions opts = new com.microsoft.playwright.BrowserType.LaunchOptions();
         List<String> caps = Arrays.asList("setheadless", "setchannel=chrome");
-        com.microsoft.playwright.BrowserType.LaunchOptions res =
-            (com.microsoft.playwright.BrowserType.LaunchOptions) m.invoke(null, opts, caps);
+        // Whether Chrome is installed on the build machine must not decide this test;
+        // ChannelAvailabilityTest covers the channel check itself.
+        boolean windows = ChannelAvailability.windows;
+        ChannelAvailability.windows = false;
+        com.microsoft.playwright.BrowserType.LaunchOptions res;
+        try {
+            res = (com.microsoft.playwright.BrowserType.LaunchOptions) m.invoke(null, opts, caps);
+        } finally {
+            ChannelAvailability.windows = windows;
+        }
         assertThat(res).isNotNull();
         assertThat(res.channel).isEqualTo("chrome");
     }
