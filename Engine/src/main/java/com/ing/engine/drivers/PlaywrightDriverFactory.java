@@ -382,7 +382,9 @@ public class PlaywrightDriverFactory {
                 String[] keyValue = prop.split("=", 2);
                 String key = keyValue[0].toLowerCase();
                 if (keyValue.length < 2) {
-                    LOGGER.warning("Context option '" + prop + "' contains no '=' delimiter; skipped");
+                    LOGGER.warning(
+                        "Context option '" + prop + "' contains no '=' delimiter; skipped"
+                    );
                     continue;
                 }
                 String value = keyValue[1];

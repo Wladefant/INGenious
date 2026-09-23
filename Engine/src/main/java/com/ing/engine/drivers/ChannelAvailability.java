@@ -209,25 +209,70 @@ public final class ChannelAvailability {
     );
 
     private static Integer readPolicyFromRegistry(String key) {
+        String out = run(
+            new ProcessBuilder("reg", "query", key, "/v", "RemoteDebuggingAllowed")
+            .redirectErrorStream(true),
+            REGISTRY_TIMEOUT_MS
+        );
+        if (out == null) {
+            return null;
+        }
+        Matcher m = DWORD.matcher(out);
+        return m.find() ? Integer.parseInt(m.group(1), 16) : null;
+    }
+
+    /** Deadline per {@code reg query}; measured 28–35 ms per query (review of ing-qa-automation#890). */
+    static final long REGISTRY_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
+
+    /**
+     * Runs a child process and returns its output — {@code null} when it cannot start, exits
+     * non-zero or outlives {@code timeoutMs}. Output is drained on its own thread and the wait is
+     * on the process, so the deadline actually applies: reading to end of stream first (as this
+     * class did until the review of ing-qa-automation#890) blocks for as long as the child keeps
+     * its output open, and {@code waitFor} only started afterwards. A child that outlives the
+     * deadline is killed together with its descendants.
+     */
+    static String run(ProcessBuilder pb, long timeoutMs) {
+        Process p;
         try {
-            Process p = new ProcessBuilder("reg", "query", key, "/v", "RemoteDebuggingAllowed")
-                .redirectErrorStream(true)
-                .start();
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            try (InputStream in = p.getInputStream()) {
-                in.transferTo(out);
-            }
-            if (!p.waitFor(5, TimeUnit.SECONDS)) {
-                p.destroyForcibly();
-                return null;
-            }
-            if (p.exitValue() != 0) {
-                return null;
-            }
-            Matcher m = DWORD.matcher(out.toString(Charset.defaultCharset()));
-            return m.find() ? Integer.parseInt(m.group(1), 16) : null;
+            p = pb.start();
         } catch (Exception ex) {
             return null;
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Thread reader = new Thread(
+            () -> {
+                try (InputStream in = p.getInputStream()) {
+                    in.transferTo(out);
+                } catch (Exception ex) {
+                    // stream closed because the process was killed: keep what was read
+                }
+            },
+            "channel-availability-output"
+        );
+        reader.setDaemon(true);
+        reader.start();
+        try {
+            if (!p.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
+                LOG.warning(
+                    () ->
+                        String.join(" ", pb.command()) +
+                        " ran longer than " +
+                        timeoutMs +
+                        " ms and was killed"
+                );
+                return null;
+            }
+            reader.join(TimeUnit.SECONDS.toMillis(1));
+            return p.exitValue() == 0 ? out.toString(Charset.defaultCharset()) : null;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return null;
+        } finally {
+            if (p.isAlive()) {
+                p.descendants().forEach(ProcessHandle::destroyForcibly);
+                p.destroyForcibly();
+            }
         }
     }
 }

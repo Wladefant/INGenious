@@ -163,4 +163,43 @@ public class ChannelAvailabilityTest {
             )
             .containsExactly("Chromium", "Firefox", "No Browser");
     }
+
+    /** A child that keeps its output open for 30 s, like a hung {@code reg.exe}. */
+    private static long hangingPings() {
+        return ProcessHandle
+            .current()
+            .descendants()
+            .filter(ProcessHandle::isAlive)
+            .filter(
+                p -> p.info().command().map(c -> c.toLowerCase().endsWith("ping.exe")).orElse(false)
+            )
+            .count();
+    }
+
+    @Test
+    public void deadlineAppliesToAChildThatKeepsItsOutputOpen() throws Exception {
+        if (!System.getProperty("os.name", "").toLowerCase().contains("win")) {
+            return;
+        }
+        long t0 = System.nanoTime();
+        String out = ChannelAvailability.run(
+            new ProcessBuilder("cmd", "/c", "ping -n 30 127.0.0.1").redirectErrorStream(true),
+            1000
+        );
+        long ms = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
+        assertThat(out).isNull();
+        assertThat(ms).as("deadline 1000 ms").isLessThan(5000);
+        long until = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        while (hangingPings() > 0 && System.nanoTime() < until) {
+            Thread.sleep(50);
+        }
+        assertThat(hangingPings()).as("child and grandchild killed").isZero();
+
+        assertThat(
+                ChannelAvailability.run(new ProcessBuilder("cmd", "/c", "echo hallo"), 5000).trim()
+            )
+            .isEqualTo("hallo");
+        assertThat(ChannelAvailability.run(new ProcessBuilder("cmd", "/c", "exit 1"), 5000))
+            .isNull();
+    }
 }
