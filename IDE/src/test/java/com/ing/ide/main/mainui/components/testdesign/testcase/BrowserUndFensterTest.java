@@ -2,12 +2,15 @@ package com.ing.ide.main.mainui.components.testdesign.testcase;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import org.testng.annotations.Test;
 
 /**
@@ -60,6 +63,46 @@ public class BrowserUndFensterTest {
         assertEquals(TestCaseComponent.browserChannelArgs("edge$(whoami)"), "");
         assertEquals(TestCaseComponent.browserChannelArgs("channel%20test"), "");
         assertEquals(TestCaseComponent.browserChannelArgs("browser&calc"), "");
+    }
+
+    /**
+     * #268 Punkt 4: the profile directory lands inside a double-quoted argument of a command
+     * that cmd or bash reads, so the characters those shells act on must never get through.
+     */
+    @Test
+    public void unsafeRecorderProfileDirectoryIsRejected() {
+        String[] unsafe = {
+            "C:\\Profile`calc`",
+            "C:\\Profile\\%APPDATA%",
+            "/home/tester/$(whoami)",
+            "/tmp/profile; rm -rf /",
+            "C:\\Pro\"file",
+            "C:\\Profile\nnext",
+        };
+        for (String value : unsafe) {
+            assertFalse(TestCaseComponent.isUsableShellArgument(value), value);
+            List<String> log = new ArrayList<>();
+            assertNull(TestCaseComponent.resolveRecorderUserDataDir(value, log::add), value);
+            assertEquals(log, List.of("Ignoring unusable recorder profile directory: " + value));
+        }
+        assertFalse(TestCaseComponent.isUsableShellArgument(null));
+    }
+
+    @Test
+    public void usableRecorderProfileDirectoryIsKept() {
+        String dir = "C:\\Users\\Tester\\AppData\\Local\\Edge Profil (ING)";
+        assertTrue(TestCaseComponent.isUsableShellArgument(dir));
+        List<String> log = new ArrayList<>();
+        assertEquals(TestCaseComponent.resolveRecorderUserDataDir(dir, log::add), dir);
+        assertEquals(log, List.of("Using the browser profile in " + dir));
+    }
+
+    @Test
+    public void unsetRecorderProfileDirectoryMeansFreshProfile() {
+        List<String> log = new ArrayList<>();
+        assertNull(TestCaseComponent.resolveRecorderUserDataDir("", log::add));
+        assertNull(TestCaseComponent.resolveRecorderUserDataDir(null, log::add));
+        assertTrue(log.isEmpty());
     }
 
     @Test

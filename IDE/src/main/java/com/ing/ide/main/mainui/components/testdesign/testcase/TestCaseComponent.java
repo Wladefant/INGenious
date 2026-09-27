@@ -73,6 +73,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -186,8 +187,11 @@ public class TestCaseComponent extends JPanel implements ActionListener {
      */
     static final int DAUERBROWSER_STARTSCHUTZ = 3;
 
-    /** Characters a shell reads even from inside a double-quoted argument. */
-    private static final String UNSAFE_ARGUMENT_CHARS = "\"%$`\n\r";
+    /**
+     * Characters a shell reads even from inside a double-quoted argument, plus the semicolon
+     * that ends a POSIX command as soon as a value stands outside its quotes.
+     */
+    private static final String UNSAFE_ARGUMENT_CHARS = "\"%$`;\n\r";
 
     private final TestDesign testDesign;
 
@@ -1155,7 +1159,10 @@ public class TestCaseComponent extends JPanel implements ActionListener {
         String browser = resolveRecordingBrowser(projectLocation);
         String channelArgs = browserChannelArgs(browser);
         String viewportArgs = viewportArgs();
-        String userDataDir = resolveRecorderUserDataDir();
+        String userDataDir = resolveRecorderUserDataDir(
+            readRecorderSetting(RecorderSettings::getBrowserUserDataDir),
+            this::logPlaywright
+        );
 
         String storageStateArgs = storageStateArgs(projectLocation);
         // Said out loud on every launch: a recorder that silently did or did not carry the
@@ -2942,18 +2949,20 @@ public class TestCaseComponent extends JPanel implements ActionListener {
      * The profile directory the recording reuses, or nothing — which is a fresh profile per
      * recording, i.e. the behaviour every existing project already has.
      *
+     * @param configured the profile directory from the project's recorder settings, or
+     *        {@code null}/empty when none is set
+     * @param log where the decision is announced to the tester
      * @return a usable directory, or {@code null} to record with a fresh profile
      */
-    private String resolveRecorderUserDataDir() {
-        String configured = readRecorderSetting(RecorderSettings::getBrowserUserDataDir);
-        if (configured.isEmpty()) {
+    static String resolveRecorderUserDataDir(String configured, Consumer<String> log) {
+        if (configured == null || configured.isEmpty()) {
             return null;
         }
         if (!isUsableShellArgument(configured)) {
-            logPlaywright("Ignoring unusable recorder profile directory: " + configured);
+            log.accept("Ignoring unusable recorder profile directory: " + configured);
             return null;
         }
-        logPlaywright("Using the browser profile in " + configured);
+        log.accept("Using the browser profile in " + configured);
         return configured;
     }
 
@@ -2982,13 +2991,18 @@ public class TestCaseComponent extends JPanel implements ActionListener {
      * <p>The command is assembled as one string and handed to a shell, and quotes alone do not
      * stop every shell from reading a value: a percent sign is what a Windows shell expands,
      * and a dollar sign or a backtick is what a POSIX shell expands, inside double quotes as
-     * much as outside them. A value carrying one of those is refused with a note in the console
-     * rather than silently mangled or, worse, executed.
+     * much as outside them. A semicolon is refused as well: it ends a POSIX command the moment
+     * the value stands outside its quotes, and a profile path has no need for one. A value
+     * carrying one of those is refused with a note in the console rather than silently mangled
+     * or, worse, executed.
      *
      * @param value the configured value
      * @return {@code true} when it is safe to pass to the recorder
      */
-    private boolean isUsableShellArgument(String value) {
+    static boolean isUsableShellArgument(String value) {
+        if (value == null) {
+            return false;
+        }
         for (int i = 0; i < value.length(); i++) {
             if (UNSAFE_ARGUMENT_CHARS.indexOf(value.charAt(i)) >= 0) {
                 return false;

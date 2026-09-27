@@ -157,6 +157,11 @@ public class PlaywrightDriverFactory {
 
     private static final Logger LOGGER = Logger.getLogger(PlaywrightDriverFactory.class.getName());
 
+    /** Said when a browser profile and a saved browser session are both configured. */
+    static final String PROFILE_DROPS_STORAGE_STATE =
+        "Browser profile in use. The saved browser session is not passed on:" +
+        " the profile carries its own.";
+
     /**
      * Removes the profile directory from the capabilities and returns it.
      *
@@ -198,7 +203,8 @@ public class PlaywrightDriverFactory {
      * one assignment per option means an option this factory learns to set later arrives here on
      * its own, instead of being quietly dropped for anyone using a profile. An option a
      * persistent context does not accept — the stored session state, which a profile on disk
-     * already carries — simply has no counterpart and is skipped.
+     * already carries — has no counterpart and is skipped; for the stored session that is said
+     * as a warning, in the same words the recorder uses.
      *
      * @param launchOptions the options the browser would have been launched with
      * @param contextOptions the options the context would have been created with
@@ -239,12 +245,22 @@ public class PlaywrightDriverFactory {
                     );
                 }
             } catch (NoSuchFieldException | IllegalAccessException ex) {
-                LOGGER.fine(
-                    "Option '" +
-                    sourceField.getName() +
-                    "' does not apply to a persistent context: " +
-                    ex.getMessage()
-                );
+                if (
+                    ex instanceof NoSuchFieldException &&
+                    sourceField.getName().startsWith("storageState")
+                ) {
+                    // The profile wins over the saved session, as in the recorder; the tester
+                    // has to read that here too, or the run looks as if the sign-in was reused.
+                    LOGGER.warning(PROFILE_DROPS_STORAGE_STATE);
+                    System.out.println(PROFILE_DROPS_STORAGE_STATE);
+                } else {
+                    LOGGER.fine(
+                        "Option '" +
+                        sourceField.getName() +
+                        "' does not apply to a persistent context: " +
+                        ex.getMessage()
+                    );
+                }
             }
         }
     }
