@@ -188,14 +188,10 @@
                     <tabWidth>4</tabWidth>
                     <useTabs>false</useTabs>
                 </configuration>
-                <executions>
-                    <execution>
-                    <phase>validate</phase>
-                    <goals>
-                        <goal>write</goal> <!-- Use 'check' in CI environments -->
-                    </goals>
-                    </execution>
-                </executions>
+                <!-- Deliberately bound to no phase (#268): a formatter that writes during
+                     `mvn test` leaves every checkout dirty, and the plugin's `check` goal
+                     crashes on Windows ("Illegal char <?>") as soon as one file is off.
+                     Format on purpose with `mvn prettier:write`; the settings above apply. -->
             </plugin>
         </plugins>
     </build>

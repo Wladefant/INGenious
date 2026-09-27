@@ -414,4 +414,67 @@ public class PlaywrightDriverFactoryTest {
         m.invoke(null, source, target);
         assertThat(target.headless).isNull();
     }
+
+    /**
+     * #268 Punkt 2: a saved browser session that a browser profile overrides is dropped, and
+     * the run says so at WARNING level in the words the recorder uses — not at FINE, which is
+     * off by default.
+     */
+    @Test
+    public void testProfileDroppingSavedSessionIsAWarning() throws Exception {
+        com.microsoft.playwright.Browser.NewContextOptions withSession = new com.microsoft.playwright.Browser.NewContextOptions()
+            .setStorageStatePath(java.nio.file.Paths.get("storage", "state.json"))
+            .setViewportSize(800, 600);
+        List<java.util.logging.LogRecord> records = copyAndCaptureLog(withSession);
+        assertThat(records)
+            .filteredOn(r -> r.getLevel().equals(java.util.logging.Level.WARNING))
+            .extracting(java.util.logging.LogRecord::getMessage)
+            .containsExactly(
+                "Browser profile in use. The saved browser session is not passed on: the profile carries its own."
+            );
+    }
+
+    @Test
+    public void testProfileWithoutSavedSessionWarnsNothing() throws Exception {
+        com.microsoft.playwright.Browser.NewContextOptions withoutSession = new com.microsoft.playwright.Browser.NewContextOptions()
+            .setViewportSize(800, 600);
+        List<java.util.logging.LogRecord> records = copyAndCaptureLog(withoutSession);
+        assertThat(records)
+            .filteredOn(r -> r.getLevel().intValue() >= java.util.logging.Level.WARNING.intValue())
+            .isEmpty();
+    }
+
+    private static List<java.util.logging.LogRecord> copyAndCaptureLog(Object source) throws Exception {
+        Method m =
+            PlaywrightDriverFactory.class.getDeclaredMethod(
+                    "copyOptionsByName",
+                    Object.class,
+                    com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions.class
+                );
+        m.setAccessible(true);
+        java.util.logging.Logger logger = java.util.logging.Logger.getLogger(PlaywrightDriverFactory.class.getName());
+        List<java.util.logging.LogRecord> records = new ArrayList<>();
+        java.util.logging.Handler handler = new java.util.logging.Handler() {
+            @Override
+            public void publish(java.util.logging.LogRecord record) {
+                records.add(record);
+            }
+
+            @Override
+            public void flush() {}
+
+            @Override
+            public void close() {}
+        };
+        java.util.logging.Level previous = logger.getLevel();
+        logger.setLevel(java.util.logging.Level.ALL);
+        logger.addHandler(handler);
+        try {
+            m.invoke(null, source, new com.microsoft.playwright.BrowserType.LaunchPersistentContextOptions());
+        } finally {
+            logger.removeHandler(handler);
+            logger.setLevel(previous);
+        }
+        return records;
+    }
 }
