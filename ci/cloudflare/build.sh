@@ -100,7 +100,7 @@ xkb_root="$x11_root/usr/share/X11/xkb"
 [[ -x "$xkbcomp" ]] || fail 'The extracted xkbcomp command is unavailable'
 [[ -d "$xkb_root" ]] || fail 'The extracted XKB keymap data is unavailable'
 export PATH="$x11_root/usr/bin:$x11_root/usr/sbin:$PATH"
-export LD_LIBRARY_PATH="$x11_root/usr/lib/x86_64-linux-gnu:$x11_root/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+export LD_LIBRARY_PATH="$JAVA_HOME/lib/server:$x11_root/usr/lib/x86_64-linux-gnu:$x11_root/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
 export XKB_CONFIG_ROOT="$xkb_root"
 awt_missing="$(ldd "$JAVA_HOME/lib/libawt_xawt.so" "$JAVA_HOME/lib/libfontmanager.so" "$JAVA_HOME/lib/libawt.so" | grep 'not found' || true)"
 if [[ -n "$awt_missing" ]]; then
