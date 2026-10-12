@@ -100,21 +100,21 @@ export PATH="$x11_root/usr/bin:$x11_root/usr/sbin:$PATH"
 export LD_LIBRARY_PATH="$x11_root/usr/lib/x86_64-linux-gnu:$x11_root/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
 export XKB_CONFIG_ROOT="$xkb_root"
 xvfb_server_args="-screen 0 1920x1080x24 -fp $x11_root/usr/share/fonts/X11/misc,$x11_root/usr/share/fonts/truetype/dejavu -xkbdir $xkb_root"
+xvfb_tmp="$TOOL_DIR/tmp"
+mkdir -p "$xvfb_tmp/.X11-unix" || fail 'Could not create a user-owned X11 socket directory'
+chmod 1777 "$xvfb_tmp/.X11-unix" || fail 'Could not prepare the user-owned X11 socket directory'
+
 
 run_xvfb() {
     local xvfb_log="$1"
     shift
     local status
-    if "$proot_path" -0 -b "$xkbcomp:/usr/bin/xkbcomp" \
+    if "$proot_path" -b "$xvfb_tmp:/tmp" -b "$xkbcomp:/usr/bin/xkbcomp" \
         /usr/bin/env \
         PATH="$PATH" \
         LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
         XKB_CONFIG_ROOT="$XKB_CONFIG_ROOT" \
-        /bin/bash -c '
-            mkdir -m 1777 -p /tmp/.X11-unix || exit 1
-            chmod 1777 /tmp/.X11-unix || exit 1
-            exec "$@"
-        ' bash "$xvfb_run" -a -e "$xvfb_log" -s "$xvfb_server_args" "$@"; then
+        /bin/bash -c 'exec "$@"' bash "$xvfb_run" -a -e "$xvfb_log" -s "$xvfb_server_args" "$@"; then
         return 0
     else
         status=$?
