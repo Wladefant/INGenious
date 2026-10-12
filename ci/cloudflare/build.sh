@@ -42,17 +42,41 @@ export PATH="$JAVA_HOME/bin:$TOOL_DIR/apache-maven-3.9.9/bin:$PATH"
 java -version
 mvn --version
 
+xvfb_server_args="-screen 0 1920x1080x24"
 if ! command -v xvfb-run >/dev/null 2>&1; then
     command -v apt-get >/dev/null 2>&1 || fail 'xvfb-run is absent and apt-get is unavailable'
-    command -v id >/dev/null 2>&1 || fail 'Cannot verify permissions to install Xvfb'
-    [[ "$(id -u)" == "0" ]] || fail 'xvfb-run is absent and the build user cannot install Xvfb'
-    apt-get update -qq || fail 'Could not refresh package metadata to install Xvfb'
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xvfb xauth fonts-dejavu-core \
-        || fail 'Could not install Xvfb'
+    command -v dpkg-deb >/dev/null 2>&1 || fail 'xvfb-run is absent and dpkg-deb is unavailable'
+    x11_root="$TOOL_DIR/x11-root"
+    apt_root="$TOOL_DIR/apt"
+    apt_archives="$apt_root/archives"
+    apt_lists="$apt_root/lists"
+    mkdir -p "$apt_archives/partial" "$apt_lists/partial"
+    apt_config=(
+        -o Debug::NoLocking=1
+        -o "Dir::Cache::archives=$apt_archives"
+        -o "Dir::Cache::pkgcache=$apt_root/pkgcache.bin"
+        -o "Dir::Cache::srcpkgcache=$apt_root/srcpkgcache.bin"
+        -o "Dir::State::lists=$apt_lists"
+    )
+    apt-get "${apt_config[@]}" update -qq || fail 'Could not refresh user-space package metadata'
+    apt-get "${apt_config[@]}" --no-install-recommends --download-only install -y \
+        xvfb xauth xfonts-base fonts-dejavu-core \
+        || fail 'Could not download Xvfb and its runtime dependencies'
+    shopt -s nullglob
+    debs=("$apt_archives"/*.deb)
+    ((${#debs[@]} > 0)) || fail 'The user-space Xvfb package download was empty'
+    for deb in "${debs[@]}"; do
+        dpkg-deb -x "$deb" "$x11_root" || fail "Could not extract package: $deb"
+        printf 'CI_X11_PACKAGE name=%s version=%s\n' \
+            "$(dpkg-deb -f "$deb" Package)" "$(dpkg-deb -f "$deb" Version)"
+    done
+    export PATH="$x11_root/usr/bin:$x11_root/usr/sbin:$PATH"
+    export LD_LIBRARY_PATH="$x11_root/usr/lib/x86_64-linux-gnu:$x11_root/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+    export XKB_CONFIG_ROOT="$x11_root/usr/share/X11/xkb"
+    xvfb_server_args="$xvfb_server_args -fp $x11_root/usr/share/fonts/X11/misc,$x11_root/usr/share/fonts/truetype/dejavu"
 fi
-command -v xvfb-run >/dev/null 2>&1 || fail 'xvfb-run remains unavailable after installation'
+command -v xvfb-run >/dev/null 2>&1 || fail 'xvfb-run remains unavailable after setup'
 xvfb-run --help >/dev/null
-dpkg-query -W -f='xvfb=${Version}\n' xvfb
 
 run_maven() {
     local label="$1"
@@ -60,7 +84,7 @@ run_maven() {
     printf 'CI_COMMAND name=%s' "$label"
     printf ' %q' "$@"
     printf '\n'
-    if xvfb-run -a -s "-screen 0 1920x1080x24" "$@"; then
+    if xvfb-run -a -s "$xvfb_server_args" "$@"; then
         return 0
     else
         local status=$?
