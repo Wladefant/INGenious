@@ -11,7 +11,7 @@ for tool in curl tar sha256sum sha512sum python3 ldd grep; do
     command -v "$tool" >/dev/null 2>&1 || fail "Required tool is missing: $tool"
 done
 TOOL_DIR="${HOME:-/opt/buildhome}/.cache/ingenious-ci-tools"
-mkdir -p "$TOOL_DIR/jdk-17.0.20.1+1" "$TOOL_DIR/apache-maven-3.9.9"
+mkdir -p "$TOOL_DIR/jdk-17.0.20.1+1" "$TOOL_DIR/jdk-11.0.32.1+1" "$TOOL_DIR/apache-maven-3.9.9"
 
 if [[ ! -x "$TOOL_DIR/jdk-17.0.20.1+1/bin/java" ]]; then
     jdk_archive="$TOOL_DIR/temurin17.tar.gz"
@@ -23,6 +23,19 @@ if [[ ! -x "$TOOL_DIR/jdk-17.0.20.1+1/bin/java" ]]; then
         "$jdk_archive" | sha256sum --check --status || fail 'Temurin archive checksum failed'
     tar -xzf "$jdk_archive" --strip-components=1 -C "$TOOL_DIR/jdk-17.0.20.1+1"
     rm "$jdk_archive"
+fi
+
+if [[ ! -x "$TOOL_DIR/jdk-11.0.32.1+1/bin/java" ]]; then
+    jdk11_archive="$TOOL_DIR/temurin11.tar.gz"
+    curl -fsSL \
+        'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.32.1%2B1/OpenJDK11U-jdk_x64_linux_hotspot_11.0.32.1_1.tar.gz' \
+        -o "$jdk11_archive"
+    printf '%s  %s\n' \
+        '5c3f68887c325d36d852ba534303e1f5f1f5cae7d6cc1e951d73e0d8e98a058d' \
+        "$jdk11_archive" | sha256sum --check --status || fail 'Temurin 11 archive checksum failed'
+    tar -xzf "$jdk11_archive" --strip-components=1 -C "$TOOL_DIR/jdk-11.0.32.1+1" \
+        || fail 'Could not unpack the pinned Temurin 11 archive'
+    rm "$jdk11_archive"
 fi
 
 if [[ ! -x "$TOOL_DIR/apache-maven-3.9.9/bin/mvn" ]]; then
@@ -187,3 +200,13 @@ if ! run_maven ingenious-framework true mvn clean install --file pom.xml; then
 fi
 
 python3 ci/cloudflare/report_surefire.py
+
+export JAVA_HOME="$TOOL_DIR/jdk-11.0.32.1+1"
+export PATH="$JAVA_HOME/bin:$PATH"
+unset JAVA_TOOL_OPTIONS MAVEN_ARGS
+java -version
+mvn --version
+printf 'CI_JAVA11_SECURITY_VERSION=11.0.32.1+1\n'
+if ! run_maven owasp-dependency-check false mvn dependency-check:check --file pom.xml; then
+    exit 1
+fi
