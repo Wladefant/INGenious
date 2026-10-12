@@ -10,7 +10,7 @@ fail() {
 for tool in curl tar sha256sum sha512sum python3; do
     command -v "$tool" >/dev/null 2>&1 || fail "Required tool is missing: $tool"
 done
-TOOL_DIR="${RUNNER_TEMP:-/tmp}/ingenious-ci-tools"
+TOOL_DIR="${HOME:-/opt/buildhome}/.cache/ingenious-ci-tools"
 mkdir -p "$TOOL_DIR/jdk-17.0.20.1+1" "$TOOL_DIR/apache-maven-3.9.9"
 
 if [[ ! -x "$TOOL_DIR/jdk-17.0.20.1+1/bin/java" ]]; then
