@@ -32,7 +32,6 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javax.imageio.ImageIO;
-import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 import org.kordamp.ikonli.javafx.FontIcon;
 import org.testng.annotations.Test;
@@ -91,7 +90,6 @@ public class TestINGToolbarKnopfTest {
 
         // 3. Erzeuge FXToolBar
         AtomicReference<FXToolBar> toolbarRef = new AtomicReference<>();
-        AtomicReference<JFrame> frameRef = new AtomicReference<>();
         CountDownLatch toolbarLatch = new CountDownLatch(1);
 
         SwingUtilities.invokeLater(
@@ -99,14 +97,8 @@ public class TestINGToolbarKnopfTest {
                 try {
                     FXToolBar fxToolBar = new FXToolBar(null);
                     toolbarRef.set(fxToolBar);
-
-                    JFrame frame = new JFrame("Studio Toolbar Test #574");
-                    frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-                    frame.add(fxToolBar);
-                    frame.setSize(1366, 200);
-                    frame.setLocationRelativeTo(null);
-                    frame.setVisible(true);
-                    frameRef.set(frame);
+                    fxToolBar.setSize(1366, 200);
+                    fxToolBar.doLayout();
                 } finally {
                     toolbarLatch.countDown();
                 }
@@ -120,7 +112,7 @@ public class TestINGToolbarKnopfTest {
         Thread.sleep(600); // Zeit fuer Rendern und CSS-Anwendung
 
         FXToolBar fxToolBar = toolbarRef.get();
-        JFrame frame = frameRef.get();
+
 
         try {
             // Finde Knoepfe auf dem FX-Thread
@@ -256,7 +248,7 @@ public class TestINGToolbarKnopfTest {
             );
 
             // Screenshot Hell aufnehmen
-            speichereScreenshot(frame, testingBtn, lightShot);
+            speichereScreenshot(testingBtn, lightShot);
             pruefeFarbenAusBild(lightShot, testingBtn, true);
 
             // ── Pruefung 3: Dunkle Ansicht (Dark Mode) ──
@@ -286,7 +278,7 @@ public class TestINGToolbarKnopfTest {
             );
 
             // Screenshot Dunkel aufnehmen
-            speichereScreenshot(frame, testingBtn, darkShot);
+            speichereScreenshot(testingBtn, darkShot);
             pruefeFarbenAusBild(darkShot, testingBtn, true);
 
             // ── Pruefung 4: Geometrie & Sichtbarkeit bei 1366x768 und 1280x720 ──
@@ -344,8 +336,8 @@ public class TestINGToolbarKnopfTest {
                 "=================================================================="
             );
         } finally {
-            if (frame != null) {
-                SwingUtilities.invokeLater(frame::dispose);
+            if (fxToolBar != null) {
+                SwingUtilities.invokeLater(() -> fxToolBar.setScene(null));
             }
         }
     }
@@ -397,7 +389,7 @@ public class TestINGToolbarKnopfTest {
         cachedByIdentityField.set(null, Collections.unmodifiableMap(map));
     }
 
-    private static void speichereScreenshot(JFrame frame, Button button, Path targetFile)
+    private static void speichereScreenshot(Button button, Path targetFile)
         throws Exception {
         // JavaFX-Snapshot direkt vom Button und der Toolbar
         CountDownLatch shotLatch = new CountDownLatch(1);

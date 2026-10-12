@@ -30,7 +30,11 @@ public class RecordingConsoleThreadTest {
 
     private static void runChild(String mode) throws Exception {
         Process child = new ProcessBuilder(
-            Path.of(System.getProperty("java.home"), "bin", "java.exe").toString(),
+            Path.of(
+                System.getProperty("java.home"),
+                "bin",
+                System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java"
+            ).toString(),
             "-cp",
             System.getProperty("java.class.path"),
             RecordingConsoleThreadTest.class.getName(),
