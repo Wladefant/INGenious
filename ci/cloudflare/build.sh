@@ -177,6 +177,8 @@ if ! run_maven ingenious-api false mvn clean install --file ./ingenious-api/pom.
     exit 1
 fi
 
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Dprism.order=sw"
+printf 'CI_JAVA_TOOL_OPTIONS=prism.order=sw\n'
 export MAVEN_ARGS="${MAVEN_ARGS:+$MAVEN_ARGS }-Pci-headless"
 printf 'CI_MAVEN_PROFILE=ci-headless\n'
 if ! run_maven ingenious-framework true mvn clean install --file pom.xml; then
