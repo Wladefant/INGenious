@@ -39,6 +39,9 @@ fi
 
 export JAVA_HOME="$TOOL_DIR/jdk-17.0.20.1+1"
 export PATH="$JAVA_HOME/bin:$TOOL_DIR/apache-maven-3.9.9/bin:$PATH"
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+export MAVEN_OPTS="${MAVEN_OPTS:+$MAVEN_OPTS }-Dfile.encoding=UTF-8"
 java -version
 mvn --version
 
