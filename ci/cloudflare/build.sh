@@ -78,7 +78,7 @@ apt_config=(
 )
 apt-get "${apt_config[@]}" update -qq || fail 'Could not refresh user-space X11 package metadata'
 apt-get "${apt_config[@]}" --no-install-recommends --download-only install -y \
-    xvfb xauth x11-xkb-utils xfonts-base fonts-dejavu-core \
+    xvfb xauth x11-xkb-utils xfonts-base fonts-dejavu-core libxtst6 \
     || fail 'Could not download user-space Xvfb runtime packages'
 shopt -s nullglob
 debs=("$apt_archives"/*.deb)
