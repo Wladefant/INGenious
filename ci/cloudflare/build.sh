@@ -45,100 +45,30 @@ export MAVEN_OPTS="${MAVEN_OPTS:+$MAVEN_OPTS }-Dfile.encoding=UTF-8"
 java -version
 mvn --version
 
-x11_root="$TOOL_DIR/x11-root"
-xvfb_server_args="-screen 0 1920x1080x24"
-if ! command -v xvfb-run >/dev/null 2>&1; then
-    command -v apt-get >/dev/null 2>&1 || fail 'xvfb-run is absent and apt-get is unavailable'
-    command -v dpkg-deb >/dev/null 2>&1 || fail 'xvfb-run is absent and dpkg-deb is unavailable'
-    apt_root="$TOOL_DIR/apt"
-    apt_archives="$apt_root/archives"
-    apt_lists="$apt_root/lists"
-    mkdir -p "$apt_archives/partial" "$apt_lists/partial"
-    apt_config=(
-        -o Debug::NoLocking=1
-        -o "Dir::Cache::archives=$apt_archives"
-        -o "Dir::Cache::pkgcache=$apt_root/pkgcache.bin"
-        -o "Dir::Cache::srcpkgcache=$apt_root/srcpkgcache.bin"
-        -o "Dir::State::lists=$apt_lists"
-    )
-    apt-get "${apt_config[@]}" update -qq || fail 'Could not refresh user-space package metadata'
-    apt-get "${apt_config[@]}" --no-install-recommends --download-only install -y \
-        xvfb xauth xfonts-base fonts-dejavu-core \
-        || fail 'Could not download Xvfb and its runtime dependencies'
-    shopt -s nullglob
-    debs=("$apt_archives"/*.deb)
-    ((${#debs[@]} > 0)) || fail 'The user-space Xvfb package download was empty'
-    for deb in "${debs[@]}"; do
-        dpkg-deb -x "$deb" "$x11_root" || fail "Could not extract package: $deb"
-        printf 'CI_X11_PACKAGE name=%s version=%s\n' \
-            "$(dpkg-deb -f "$deb" Package)" "$(dpkg-deb -f "$deb" Version)"
-    done
-    export PATH="$x11_root/usr/bin:$x11_root/usr/sbin:$PATH"
-    export LD_LIBRARY_PATH="$x11_root/usr/lib/x86_64-linux-gnu:$x11_root/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
-    xvfb_server_args="$xvfb_server_args -fp $x11_root/usr/share/fonts/X11/misc,$x11_root/usr/share/fonts/truetype/dejavu"
-fi
-xkb_root="$x11_root/usr/share/X11/xkb"
-if [[ ! -d "$xkb_root" ]]; then
-    xkb_root=/usr/share/X11/xkb
-fi
-[[ -d "$xkb_root" ]] || fail 'XKB keymap data directory is unavailable'
-export XKB_CONFIG_ROOT="$xkb_root"
-xvfb_server_args="$xvfb_server_args -xkbdir $xkb_root"
-command -v xvfb-run >/dev/null 2>&1 || fail 'xvfb-run remains unavailable after setup'
-xvfb-run --help >/dev/null
-x11_socket_dir=/tmp/.X11-unix
-if [[ ! -d "$x11_socket_dir" ]]; then
-    mkdir -m 1777 "$x11_socket_dir" || fail 'Could not create user-owned X11 socket directory'
-    chmod 1777 "$x11_socket_dir" || fail 'Could not set sticky permissions on X11 socket directory'
-fi
-[[ -w "$x11_socket_dir" ]] || fail 'X11 socket directory is not writable by the build user'
-xvfb_smoke_log="$TOOL_DIR/xvfb-smoke.log"
-if xvfb-run -a -e "$xvfb_smoke_log" -s "$xvfb_server_args" true; then
-    printf 'CI_XVFB_SMOKE passed\n'
-else
-    status=$?
-    if [[ -s "$xvfb_smoke_log" ]]; then
-        printf 'CI_XVFB_ERROR_BEGIN\n' >&2
-        cat "$xvfb_smoke_log" >&2
-        printf 'CI_XVFB_ERROR_END\n' >&2
-    fi
-    fail "Xvfb smoke failed exit=$status"
-fi
 
 run_maven() {
     local label="$1"
-    local needs_display="$2"
-    shift 2
-    printf 'CI_COMMAND name=%s display=%s' "$label" "$needs_display"
+    shift
+    printf 'CI_COMMAND name=%s' "$label"
     printf ' %q' "$@"
     printf '\n'
-    local -a runner_command
-    local xvfb_log="$TOOL_DIR/xvfb-${label}.log"
-    if [[ "$needs_display" == "true" ]]; then
-        runner_command=(xvfb-run -a -e "$xvfb_log" -s "$xvfb_server_args" "$@")
-    else
-        runner_command=("$@")
-    fi
-    if "${runner_command[@]}"; then
+    if "$@"; then
         return 0
     else
         local status=$?
-        if [[ "$needs_display" == "true" && -s "$xvfb_log" ]]; then
-            printf 'CI_XVFB_ERROR_BEGIN\n' >&2
-            cat "$xvfb_log" >&2
-            printf 'CI_XVFB_ERROR_END\n' >&2
-        fi
         printf 'CI_ERROR command=%s exit=%s\n' "$label" "$status" >&2
         return "$status"
     fi
 }
 
-if ! run_maven ingenious-api false mvn clean install --file ./ingenious-api/pom.xml; then
+if ! run_maven ingenious-api mvn clean install --file ./ingenious-api/pom.xml; then
     python3 ci/cloudflare/report_surefire.py || true
     exit 1
 fi
 
-if ! run_maven ingenious-framework true mvn clean install --file pom.xml; then
+export MAVEN_ARGS="${MAVEN_ARGS:+$MAVEN_ARGS }-Pci-headless"
+printf 'CI_MAVEN_PROFILE=%s\n' "$MAVEN_ARGS"
+if ! run_maven ingenious-framework mvn clean install --file pom.xml; then
     python3 ci/cloudflare/report_surefire.py || true
     exit 1
 fi
