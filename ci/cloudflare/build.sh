@@ -11,17 +11,17 @@ for tool in curl tar sha256sum sha512sum python3; do
     command -v "$tool" >/dev/null 2>&1 || fail "Required tool is missing: $tool"
 done
 TOOL_DIR="${RUNNER_TEMP:-/tmp}/ingenious-ci-tools"
-mkdir -p "$TOOL_DIR/jdk-17.0.14+7" "$TOOL_DIR/apache-maven-3.9.9"
+mkdir -p "$TOOL_DIR/jdk-17.0.20.1+1" "$TOOL_DIR/apache-maven-3.9.9"
 
-if [[ ! -x "$TOOL_DIR/jdk-17.0.14+7/bin/java" ]]; then
+if [[ ! -x "$TOOL_DIR/jdk-17.0.20.1+1/bin/java" ]]; then
     jdk_archive="$TOOL_DIR/temurin17.tar.gz"
     curl -fsSL \
-        'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.14%2B7/OpenJDK17U-jdk_x64_linux_hotspot_17.0.14_7.tar.gz' \
+        'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz' \
         -o "$jdk_archive"
     printf '%s  %s\n' \
-        'a3af83983fb94dd7d11b13ba2dba0fb6819dc2caaf87e6937afd22ad4680ae9a' \
+        '3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e' \
         "$jdk_archive" | sha256sum --check --status || fail 'Temurin archive checksum failed'
-    tar -xzf "$jdk_archive" --strip-components=1 -C "$TOOL_DIR/jdk-17.0.14+7"
+    tar -xzf "$jdk_archive" --strip-components=1 -C "$TOOL_DIR/jdk-17.0.20.1+1"
     rm "$jdk_archive"
 fi
 
@@ -37,7 +37,7 @@ if [[ ! -x "$TOOL_DIR/apache-maven-3.9.9/bin/mvn" ]]; then
     rm "$maven_archive"
 fi
 
-export JAVA_HOME="$TOOL_DIR/jdk-17.0.14+7"
+export JAVA_HOME="$TOOL_DIR/jdk-17.0.20.1+1"
 export PATH="$JAVA_HOME/bin:$TOOL_DIR/apache-maven-3.9.9/bin:$PATH"
 java -version
 mvn --version
