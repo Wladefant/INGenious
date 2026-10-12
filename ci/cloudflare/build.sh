@@ -45,11 +45,11 @@ export MAVEN_OPTS="${MAVEN_OPTS:+$MAVEN_OPTS }-Dfile.encoding=UTF-8"
 java -version
 mvn --version
 
-xvfb_server_args="-screen 0 1920x1080x24"
+x11_root="$TOOL_DIR/x11-root"
+xvfb_server_args="-screen 0 1920x1080x24 -kb"
 if ! command -v xvfb-run >/dev/null 2>&1; then
     command -v apt-get >/dev/null 2>&1 || fail 'xvfb-run is absent and apt-get is unavailable'
     command -v dpkg-deb >/dev/null 2>&1 || fail 'xvfb-run is absent and dpkg-deb is unavailable'
-    x11_root="$TOOL_DIR/x11-root"
     apt_root="$TOOL_DIR/apt"
     apt_archives="$apt_root/archives"
     apt_lists="$apt_root/lists"
@@ -80,6 +80,12 @@ if ! command -v xvfb-run >/dev/null 2>&1; then
 fi
 command -v xvfb-run >/dev/null 2>&1 || fail 'xvfb-run remains unavailable after setup'
 xvfb-run --help >/dev/null
+x11_socket_dir=/tmp/.X11-unix
+if [[ ! -d "$x11_socket_dir" ]]; then
+    mkdir -m 1777 "$x11_socket_dir" || fail 'Could not create user-owned X11 socket directory'
+    chmod 1777 "$x11_socket_dir" || fail 'Could not set sticky permissions on X11 socket directory'
+fi
+[[ -w "$x11_socket_dir" ]] || fail 'X11 socket directory is not writable by the build user'
 xvfb_smoke_log="$TOOL_DIR/xvfb-smoke.log"
 if xvfb-run -a -e "$xvfb_smoke_log" -s "$xvfb_server_args" true; then
     printf 'CI_XVFB_SMOKE passed\n'
