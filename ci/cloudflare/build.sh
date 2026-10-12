@@ -80,14 +80,27 @@ if ! command -v xvfb-run >/dev/null 2>&1; then
 fi
 command -v xvfb-run >/dev/null 2>&1 || fail 'xvfb-run remains unavailable after setup'
 xvfb-run --help >/dev/null
+if xvfb-run -a -s "$xvfb_server_args" true; then
+    printf 'CI_XVFB_SMOKE passed\n'
+else
+    status=$?
+    fail "Xvfb smoke failed exit=$status"
+fi
 
 run_maven() {
     local label="$1"
-    shift
-    printf 'CI_COMMAND name=%s' "$label"
+    local needs_display="$2"
+    shift 2
+    printf 'CI_COMMAND name=%s display=%s' "$label" "$needs_display"
     printf ' %q' "$@"
     printf '\n'
-    if xvfb-run -a -s "$xvfb_server_args" "$@"; then
+    local -a runner_command
+    if [[ "$needs_display" == "true" ]]; then
+        runner_command=(xvfb-run -a -s "$xvfb_server_args" "$@")
+    else
+        runner_command=("$@")
+    fi
+    if "${runner_command[@]}"; then
         return 0
     else
         local status=$?
@@ -96,12 +109,12 @@ run_maven() {
     fi
 }
 
-if ! run_maven ingenious-api mvn clean install --file ./ingenious-api/pom.xml; then
+if ! run_maven ingenious-api false mvn clean install --file ./ingenious-api/pom.xml; then
     python3 ci/cloudflare/report_surefire.py || true
     exit 1
 fi
 
-if ! run_maven ingenious-framework mvn clean install --file pom.xml; then
+if ! run_maven ingenious-framework true mvn clean install --file pom.xml; then
     python3 ci/cloudflare/report_surefire.py || true
     exit 1
 fi
