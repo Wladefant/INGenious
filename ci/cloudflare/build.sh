@@ -46,7 +46,7 @@ java -version
 mvn --version
 
 x11_root="$TOOL_DIR/x11-root"
-xvfb_server_args="-screen 0 1920x1080x24 -kb"
+xvfb_server_args="-screen 0 1920x1080x24"
 if ! command -v xvfb-run >/dev/null 2>&1; then
     command -v apt-get >/dev/null 2>&1 || fail 'xvfb-run is absent and apt-get is unavailable'
     command -v dpkg-deb >/dev/null 2>&1 || fail 'xvfb-run is absent and dpkg-deb is unavailable'
@@ -75,9 +75,15 @@ if ! command -v xvfb-run >/dev/null 2>&1; then
     done
     export PATH="$x11_root/usr/bin:$x11_root/usr/sbin:$PATH"
     export LD_LIBRARY_PATH="$x11_root/usr/lib/x86_64-linux-gnu:$x11_root/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
-    export XKB_CONFIG_ROOT="$x11_root/usr/share/X11/xkb"
     xvfb_server_args="$xvfb_server_args -fp $x11_root/usr/share/fonts/X11/misc,$x11_root/usr/share/fonts/truetype/dejavu"
 fi
+xkb_root="$x11_root/usr/share/X11/xkb"
+if [[ ! -d "$xkb_root" ]]; then
+    xkb_root=/usr/share/X11/xkb
+fi
+[[ -d "$xkb_root" ]] || fail 'XKB keymap data directory is unavailable'
+export XKB_CONFIG_ROOT="$xkb_root"
+xvfb_server_args="$xvfb_server_args -xkbdir $xkb_root"
 command -v xvfb-run >/dev/null 2>&1 || fail 'xvfb-run remains unavailable after setup'
 xvfb-run --help >/dev/null
 x11_socket_dir=/tmp/.X11-unix
