@@ -46,29 +46,131 @@ java -version
 mvn --version
 
 
-run_maven() {
-    local label="$1"
+[[ "$(uname -m)" == "x86_64" ]] || fail 'The pinned PRoot binary requires x86_64'
+for tool in apt-get dpkg-deb; do
+    command -v "$tool" >/dev/null 2>&1 || fail "Required X11 package tool is missing: $tool"
+done
+
+proot_path="$TOOL_DIR/proot-5.5.0"
+if [[ ! -x "$proot_path" ]]; then
+    proot_archive="$TOOL_DIR/proot-5.5.0"
+    curl -fsSL \
+        'https://github.com/proot-me/proot/releases/download/v5.5.0/proot' \
+        -o "$proot_archive"
+    printf '%s  %s\n' \
+        'db185300a9daabbce86aca7632d8c7fdc4249f6f153171954013b70c5f491ec0' \
+        "$proot_archive" | sha256sum --check --status || fail 'PRoot archive checksum failed'
+    chmod 755 "$proot_archive"
+fi
+"$proot_path" --version
+
+x11_root="$TOOL_DIR/x11-root"
+apt_root="$TOOL_DIR/apt"
+apt_archives="$apt_root/archives"
+apt_lists="$apt_root/lists"
+mkdir -p "$x11_root" "$apt_archives/partial" "$apt_lists/partial"
+apt_config=(
+    -o Debug::NoLocking=1
+    -o "Dir::Cache::archives=$apt_archives"
+    -o "Dir::Cache::pkgcache=$apt_root/pkgcache.bin"
+    -o "Dir::Cache::srcpkgcache=$apt_root/srcpkgcache.bin"
+    -o "Dir::State::lists=$apt_lists"
+)
+apt-get "${apt_config[@]}" update -qq || fail 'Could not refresh user-space X11 package metadata'
+apt-get "${apt_config[@]}" --no-install-recommends --download-only install -y \
+    xvfb xauth x11-xkb-utils xfonts-base fonts-dejavu-core \
+    || fail 'Could not download user-space Xvfb runtime packages'
+shopt -s nullglob
+debs=("$apt_archives"/*.deb)
+((${#debs[@]} > 0)) || fail 'The user-space X11 package download was empty'
+for deb in "${debs[@]}"; do
+    dpkg-deb -x "$deb" "$x11_root" || fail "Could not extract package: $deb"
+    printf 'CI_X11_PACKAGE name=%s version=%s\n' \
+        "$(dpkg-deb -f "$deb" Package)" "$(dpkg-deb -f "$deb" Version)"
+done
+shopt -u nullglob
+
+xvfb_run="$x11_root/usr/bin/xvfb-run"
+xkbcomp="$x11_root/usr/bin/xkbcomp"
+xkb_root="$x11_root/usr/share/X11/xkb"
+[[ -x "$xvfb_run" ]] || fail 'The extracted xvfb-run command is unavailable'
+[[ -x "$xkbcomp" ]] || fail 'The extracted xkbcomp command is unavailable'
+[[ -d "$xkb_root" ]] || fail 'The extracted XKB keymap data is unavailable'
+export PATH="$x11_root/usr/bin:$x11_root/usr/sbin:$PATH"
+export LD_LIBRARY_PATH="$x11_root/usr/lib/x86_64-linux-gnu:$x11_root/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+export XKB_CONFIG_ROOT="$xkb_root"
+xvfb_server_args="-screen 0 1920x1080x24 -fp $x11_root/usr/share/fonts/X11/misc,$x11_root/usr/share/fonts/truetype/dejavu -xkbdir $xkb_root"
+
+run_xvfb() {
+    local xvfb_log="$1"
     shift
-    printf 'CI_COMMAND name=%s' "$label"
-    printf ' %q' "$@"
-    printf '\n'
-    if "$@"; then
+    local status
+    if "$proot_path" -0 -b "$xkbcomp:/usr/bin/xkbcomp" \
+        /usr/bin/env \
+        PATH="$PATH" \
+        LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
+        XKB_CONFIG_ROOT="$XKB_CONFIG_ROOT" \
+        /bin/bash -c '
+            mkdir -m 1777 -p /tmp/.X11-unix || exit 1
+            chmod 1777 /tmp/.X11-unix || exit 1
+            exec "$@"
+        ' bash "$xvfb_run" -a -e "$xvfb_log" -s "$xvfb_server_args" "$@"; then
         return 0
     else
-        local status=$?
-        printf 'CI_ERROR command=%s exit=%s\n' "$label" "$status" >&2
-        return "$status"
+        status=$?
     fi
+    if [[ -s "$xvfb_log" ]]; then
+        printf 'CI_XVFB_ERROR_BEGIN\n' >&2
+        cat "$xvfb_log" >&2
+        printf 'CI_XVFB_ERROR_END\n' >&2
+    fi
+    printf 'CI_ERROR xvfb_exit=%s\n' "$status" >&2
+    return "$status"
 }
 
-if ! run_maven ingenious-api mvn clean install --file ./ingenious-api/pom.xml; then
+if run_xvfb "$TOOL_DIR/xvfb-smoke.log" true; then
+    printf 'CI_XVFB_SMOKE passed\n'
+else
+    fail 'Rootless Xvfb smoke failed'
+fi
+
+
+run_maven() {
+    local label="$1"
+    local needs_display="$2"
+    shift 2
+    local status
+    if [[ "$needs_display" == "true" ]]; then
+        printf 'CI_COMMAND name=%s display=xvfb' "$label"
+        printf ' %q' "$@"
+        printf '\n'
+        if run_xvfb "$TOOL_DIR/xvfb-${label}.log" "$@"; then
+            return 0
+        else
+            status=$?
+        fi
+    else
+        printf 'CI_COMMAND name=%s display=none' "$label"
+        printf ' %q' "$@"
+        printf '\n'
+        if "$@"; then
+            return 0
+        else
+            status=$?
+        fi
+    fi
+    printf 'CI_ERROR command=%s exit=%s\n' "$label" "$status" >&2
+    return "$status"
+}
+
+if ! run_maven ingenious-api false mvn clean install --file ./ingenious-api/pom.xml; then
     python3 ci/cloudflare/report_surefire.py || true
     exit 1
 fi
 
 export MAVEN_ARGS="${MAVEN_ARGS:+$MAVEN_ARGS }-Pci-headless"
-printf 'CI_MAVEN_PROFILE=%s\n' "$MAVEN_ARGS"
-if ! run_maven ingenious-framework mvn clean install --file pom.xml; then
+printf 'CI_MAVEN_PROFILE=ci-headless\n'
+if ! run_maven ingenious-framework true mvn clean install --file pom.xml; then
     python3 ci/cloudflare/report_surefire.py || true
     exit 1
 fi
