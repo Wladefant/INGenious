@@ -80,10 +80,16 @@ if ! command -v xvfb-run >/dev/null 2>&1; then
 fi
 command -v xvfb-run >/dev/null 2>&1 || fail 'xvfb-run remains unavailable after setup'
 xvfb-run --help >/dev/null
-if xvfb-run -a -s "$xvfb_server_args" true; then
+xvfb_smoke_log="$TOOL_DIR/xvfb-smoke.log"
+if xvfb-run -a -e "$xvfb_smoke_log" -s "$xvfb_server_args" true; then
     printf 'CI_XVFB_SMOKE passed\n'
 else
     status=$?
+    if [[ -s "$xvfb_smoke_log" ]]; then
+        printf 'CI_XVFB_ERROR_BEGIN\n' >&2
+        cat "$xvfb_smoke_log" >&2
+        printf 'CI_XVFB_ERROR_END\n' >&2
+    fi
     fail "Xvfb smoke failed exit=$status"
 fi
 
@@ -95,8 +101,9 @@ run_maven() {
     printf ' %q' "$@"
     printf '\n'
     local -a runner_command
+    local xvfb_log="$TOOL_DIR/xvfb-${label}.log"
     if [[ "$needs_display" == "true" ]]; then
-        runner_command=(xvfb-run -a -s "$xvfb_server_args" "$@")
+        runner_command=(xvfb-run -a -e "$xvfb_log" -s "$xvfb_server_args" "$@")
     else
         runner_command=("$@")
     fi
@@ -104,6 +111,11 @@ run_maven() {
         return 0
     else
         local status=$?
+        if [[ "$needs_display" == "true" && -s "$xvfb_log" ]]; then
+            printf 'CI_XVFB_ERROR_BEGIN\n' >&2
+            cat "$xvfb_log" >&2
+            printf 'CI_XVFB_ERROR_END\n' >&2
+        fi
         printf 'CI_ERROR command=%s exit=%s\n' "$label" "$status" >&2
         return "$status"
     fi
