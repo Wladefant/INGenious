@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Emit named test counts from Maven Surefire XML reports."""
 
+import json
 from pathlib import Path
 import sys
 import xml.etree.ElementTree as ET
@@ -28,6 +29,26 @@ for report in reports:
     counts["passed"] = counts["tests"] - counts["failures"] - counts["errors"] - counts["skipped"]
     if counts["passed"] <= 0:
         all_reports_have_passes = False
+    case_names = {}
+    for case in root.iter("testcase"):
+        class_name = case.attrib.get("classname", "<unknown>")
+        case_names.setdefault(class_name, []).append(case.attrib.get("name", "<unnamed>"))
+    if sum(len(names) for names in case_names.values()) != counts["tests"]:
+        print(
+            f"CI_ERROR testcase count mismatch path={report} "
+            f"xml={counts['tests']} named={sum(len(names) for names in case_names.values())}",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    for class_name, names in sorted(case_names.items()):
+        print(
+            "TEST_CLASS "
+            + json.dumps(
+                {"name": class_name, "tests": len(names), "cases": names},
+                ensure_ascii=True,
+                separators=(",", ":"),
+            )
+        )
     for key, value in counts.items():
         totals[key] += value
     print(
