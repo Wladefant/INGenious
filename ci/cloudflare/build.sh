@@ -42,13 +42,25 @@ export PATH="$JAVA_HOME/bin:$TOOL_DIR/apache-maven-3.9.9/bin:$PATH"
 java -version
 mvn --version
 
+if ! command -v xvfb-run >/dev/null 2>&1; then
+    command -v apt-get >/dev/null 2>&1 || fail 'xvfb-run is absent and apt-get is unavailable'
+    command -v id >/dev/null 2>&1 || fail 'Cannot verify permissions to install Xvfb'
+    [[ "$(id -u)" == "0" ]] || fail 'xvfb-run is absent and the build user cannot install Xvfb'
+    apt-get update -qq || fail 'Could not refresh package metadata to install Xvfb'
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xvfb xauth fonts-dejavu-core \
+        || fail 'Could not install Xvfb'
+fi
+command -v xvfb-run >/dev/null 2>&1 || fail 'xvfb-run remains unavailable after installation'
+xvfb-run --help >/dev/null
+dpkg-query -W -f='xvfb=${Version}\n' xvfb
+
 run_maven() {
     local label="$1"
     shift
     printf 'CI_COMMAND name=%s' "$label"
     printf ' %q' "$@"
     printf '\n'
-    if "$@"; then
+    if xvfb-run -a -s "-screen 0 1920x1080x24" "$@"; then
         return 0
     else
         local status=$?
