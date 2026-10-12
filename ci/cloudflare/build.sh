@@ -7,7 +7,7 @@ fail() {
 }
 
 
-for tool in curl tar sha256sum sha512sum python3; do
+for tool in curl tar sha256sum sha512sum python3 ldd grep; do
     command -v "$tool" >/dev/null 2>&1 || fail "Required tool is missing: $tool"
 done
 TOOL_DIR="${HOME:-/opt/buildhome}/.cache/ingenious-ci-tools"
@@ -78,7 +78,10 @@ apt_config=(
 )
 apt-get "${apt_config[@]}" update -qq || fail 'Could not refresh user-space X11 package metadata'
 apt-get "${apt_config[@]}" --no-install-recommends --download-only install -y \
-    xvfb xauth x11-xkb-utils xfonts-base fonts-dejavu-core libxtst6 \
+    xvfb xauth x11-xkb-utils xfonts-base fonts-dejavu-core \
+    libxtst6 libxi6 libxrender1 libxext6 libx11-6 libxfixes3 libxcursor1 \
+    libxrandr2 libxinerama1 libxss1 libfontconfig1 libfreetype6 libasound2t64 \
+    libxau6 libxdmcp6 libxcb1 libpng16-16 \
     || fail 'Could not download user-space Xvfb runtime packages'
 shopt -s nullglob
 debs=("$apt_archives"/*.deb)
@@ -99,6 +102,12 @@ xkb_root="$x11_root/usr/share/X11/xkb"
 export PATH="$x11_root/usr/bin:$x11_root/usr/sbin:$PATH"
 export LD_LIBRARY_PATH="$x11_root/usr/lib/x86_64-linux-gnu:$x11_root/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
 export XKB_CONFIG_ROOT="$xkb_root"
+awt_missing="$(ldd "$JAVA_HOME/lib/libawt_xawt.so" "$JAVA_HOME/lib/libfontmanager.so" "$JAVA_HOME/lib/libawt.so" | grep 'not found' || true)"
+if [[ -n "$awt_missing" ]]; then
+    printf 'CI_AWT_LINKAGE_ERROR_BEGIN\n%s\nCI_AWT_LINKAGE_ERROR_END\n' "$awt_missing" >&2
+    fail 'Java AWT native runtime libraries are unresolved'
+fi
+printf 'CI_AWT_LINKAGE=resolved\n'
 xvfb_server_args="-screen 0 1920x1080x24 -fp $x11_root/usr/share/fonts/X11/misc,$x11_root/usr/share/fonts/truetype/dejavu -xkbdir $xkb_root"
 xvfb_tmp="$TOOL_DIR/tmp"
 mkdir -p "$xvfb_tmp/.X11-unix" || fail 'Could not create a user-owned X11 socket directory'
